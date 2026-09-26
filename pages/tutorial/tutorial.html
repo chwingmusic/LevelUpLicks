@@ -1,0 +1,32 @@
+<div class="space-y-6">
+    <div class="flex flex-col space-y-1 border-b border-zinc-800/80 pb-4">
+        <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Bring Your Own Database (BYODB) Setup</h2>
+        <p class="text-xs text-zinc-400">Step-by-step instructions to create a 100% free personal Firebase instance.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
+            <span class="text-amber-400 font-bold font-mono text-xs">STEP 01</span>
+            <h3 class="text-sm font-bold text-white">Create Firebase Project</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Go to <a href="https://console.firebase.google.com" target="_blank" class="text-amber-400 underline">firebase.google.com</a>, sign in, click <strong>"Add Project"</strong>, and name it <code class="text-emerald-400">LevelUpLicks</code>.</p>
+        </div>
+
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
+            <span class="text-amber-400 font-bold font-mono text-xs">STEP 02</span>
+            <h3 class="text-sm font-bold text-white">Register Web Application</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Inside Project Overview, click the Web icon (<code class="text-amber-400">&lt;/&gt;</code>) to register an app. Copy the generated <code class="text-emerald-400">firebaseConfig</code> object JSON.</p>
+        </div>
+
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
+            <span class="text-amber-400 font-bold font-mono text-xs">STEP 03</span>
+            <h3 class="text-sm font-bold text-white">Enable Firestore & Auth</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Under Authentication, enable <strong>Google Sign-In</strong>. Under Firestore Database, click <strong>Create Database</strong> in Test Mode.</p>
+        </div>
+
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
+            <span class="text-amber-400 font-bold font-mono text-xs">STEP 04</span>
+            <h3 class="text-sm font-bold text-white">Paste into Configuration</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Head over to the <strong>Configuration</strong> page, paste your JSON block, and click <strong>Connect Personal Instance</strong>.</p>
+        </div>
+    </div>
+</div>
