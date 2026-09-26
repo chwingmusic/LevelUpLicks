@@ -1,0 +1,87 @@
+<div class="space-y-6">
+    <div class="flex flex-col space-y-1 border-b border-zinc-800/80 pb-4">
+        <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Today's Practice Laboratory</h2>
+        <p class="text-xs text-zinc-400">Interactive tempo generator, stopwatch, and precision velocity logging tool.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- METRONOME & TIMER CONTROL SUITE -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-5 text-center">
+                <span class="text-[10px] font-bold tracking-widest text-amber-500 uppercase">Precision Audio Metronome</span>
+                
+                <div class="py-2">
+                    <div id="metronomeBpmDisplay" class="text-6xl font-['Space_Grotesk'] font-bold text-white tracking-tight">120</div>
+                    <p class="text-xs text-zinc-500 mt-1">Beats Per Minute</p>
+                </div>
+
+                <div class="space-y-2">
+                    <input id="bpmSlider" type="range" min="40" max="240" value="120" class="w-full accent-amber-500 bg-zinc-800 h-2 rounded-lg cursor-pointer">
+                    <div class="flex justify-between text-[10px] text-zinc-500 font-mono">
+                        <span>40 BPM</span>
+                        <span>140 BPM</span>
+                        <span>240 BPM</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-center space-x-3 pt-2">
+                    <button id="btnBpmMinus" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 w-10 h-10 rounded-xl font-bold text-lg">-</button>
+                    <button id="btnToggleMetronome" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-sm px-8 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20">
+                        Start Metronome ▶
+                    </button>
+                    <button id="btnBpmPlus" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 w-10 h-10 rounded-xl font-bold text-lg">+</button>
+                </div>
+            </div>
+
+            <!-- STOPWATCH TIMER -->
+            <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold uppercase text-zinc-500">Session Clock</span>
+                    <div id="timerDisplay" class="text-2xl font-mono font-bold text-amber-400">00:00:00</div>
+                </div>
+                <button id="btnToggleTimer" class="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 px-4 py-2 rounded-xl border border-zinc-700">
+                    Start Clock
+                </button>
+            </div>
+        </div>
+
+        <!-- PRACTICE LOG FORM -->
+        <div class="lg:col-span-7 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
+            <h3 class="text-base font-bold text-white">Log Executed Exercise / Lick</h3>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-bold text-zinc-400">Select Practice Topic</label>
+                    <select id="practiceTopicSelect" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-bold text-zinc-400">Clean Reached BPM</label>
+                        <input id="logBpmInput" type="number" value="120" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-zinc-400">Cleanliness Rating</label>
+                        <select id="logRating" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500">
+                            <option value="5">⭐⭐⭐⭐⭐ Effortless</option>
+                            <option value="4">⭐⭐⭐⭐ Solid</option>
+                            <option value="3">⭐⭐⭐ Slight Buzz</option>
+                            <option value="2">⭐⭐ Sloppy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-zinc-400">Session Notes / Observations</label>
+                    <textarea id="logNotes" rows="3" placeholder="Focus on light thumb pressure and relaxed wrist picking..." class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500"></textarea>
+                </div>
+
+                <button id="btnSavePracticeSession" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs py-3 rounded-xl transition-all shadow-md shadow-amber-500/10">
+                    Commit Practice Entry
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
