@@ -18,29 +18,27 @@ const SYSTEM_DROPDOWNS_DEFAULT = {
 
 let activeDropdowns = null;
 let activeTopicsList = [];
-let personalDb = null; // Will store the user's connected database instance
-let existingAttachments = []; // Stores existing base64 attachments during edit mode
+let personalDb = null;
+let existingAttachments = [];
 
 export async function initPage() {
     const activeUser = gatewayAuth.currentUser;
     if (!activeUser) return;
-
-    // Resolve user's personal database instance
-    personalDb = await getPersonalDatabaseInstance(activeUser);
 
     const tabUser = document.getElementById('tab-user-config');
     const tabPractice = document.getElementById('tab-practice-config');
     const panelUser = document.getElementById('panel-user-config');
     const panelPractice = document.getElementById('panel-practice-config');
 
-    tabUser.addEventListener('click', () => {
+    // Helper function to switch tabs
+    const switchToUserTab = () => {
         tabUser.className = "w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50";
         tabPractice.className = "w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200";
         panelUser.classList.remove('hidden');
         panelPractice.classList.add('hidden');
-    });
+    };
 
-    tabPractice.addEventListener('click', async () => {
+    const switchToPracticeTab = async () => {
         tabPractice.className = "w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50";
         tabUser.className = "w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200";
         panelPractice.classList.remove('hidden');
@@ -49,9 +47,22 @@ export async function initPage() {
         const dbToUse = personalDb || gatewayDb;
         await setupDropdownOptions(activeUser, dbToUse);
         await renderTopicsCatalog(activeUser, dbToUse);
-    });
+    };
 
-    setupConnectionTab(activeUser);
+    // Attach click listeners
+    tabUser.addEventListener('click', switchToUserTab);
+    tabPractice.addEventListener('click', switchToPracticeTab);
+
+    // Setup Connection & Load configuration check
+    const hasConfiguredDb = await setupConnectionTab(activeUser);
+
+    // Smart Routing: If user already setup database, default to Topic Management!
+    if (hasConfiguredDb) {
+        await switchToPracticeTab();
+    } else {
+        switchToUserTab();
+    }
+
     setupTopicFormListeners(activeUser);
 }
 
@@ -79,6 +90,7 @@ async function setupConnectionTab(activeUser) {
     const inputArea = document.getElementById('configJsonInput');
     const statusText = document.getElementById('statusMessageText');
     const saveBtn = document.getElementById('btnSaveConfig');
+    let hasConnection = false;
 
     try {
         const snapshot = await getDoc(doc(gatewayDb, "user_configs", activeUser.uid));
@@ -86,6 +98,10 @@ async function setupConnectionTab(activeUser) {
             inputArea.value = JSON.stringify(snapshot.data(), null, 2);
             statusText.innerText = "Personal Database Connection Synchronized.";
             statusText.previousElementSibling.className = "h-2 w-2 rounded-full bg-emerald-500";
+            
+            // Initialize database instance for practice panel loading
+            personalDb = await getPersonalDatabaseInstance(activeUser);
+            hasConnection = true;
         }
     } catch (e) {
         console.error("Config fetch error:", e);
@@ -114,6 +130,8 @@ async function setupConnectionTab(activeUser) {
             statusText.previousElementSibling.className = "h-2 w-2 rounded-full bg-rose-500";
         }
     });
+
+    return hasConnection;
 }
 
 // Fetch or Seed Dropdowns
@@ -242,7 +260,6 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicSubCategoryCustom').classList.add('hidden');
         document.getElementById('formTitleText').innerHTML = "<span>🎸</span> <span>Add New Practice Topic</span>";
         
-        // Reset subcategory dropdown back to default category state
         updateSubCategories();
         resetBtn.classList.add('hidden');
     });
@@ -260,7 +277,6 @@ function setupTopicFormListeners(activeUser) {
 
         await updateDropdownsWithCustomEntry(activeUser, dbToUse, category, subCategory);
 
-        // Process new file selection
         const filesInput = document.getElementById('topicFileInput');
         const newAttachments = [];
         for (let file of filesInput.files) {
@@ -268,7 +284,6 @@ function setupTopicFormListeners(activeUser) {
             newAttachments.push({ name: file.name, data: base64 });
         }
 
-        // Combine existing retained attachments with newly selected files
         const finalAttachments = [...existingAttachments, ...newAttachments];
 
         const topicPayload = {
@@ -307,7 +322,6 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicTitle').value = t.title;
         document.getElementById('topicTag').value = t.tag;
 
-        // 1. Set Category and refresh available subcategory dropdown items
         const catSelect = document.getElementById('topicCategory');
         if (activeDropdowns.categories[t.category]) {
             catSelect.value = t.category;
@@ -318,10 +332,8 @@ function setupTopicFormListeners(activeUser) {
             document.getElementById('topicCategoryCustom').value = t.category;
         }
 
-        // Rebuild subcategory options corresponding to selected category
         updateSubCategories();
 
-        // 2. Select Sub-Category
         const subSelect = document.getElementById('topicSubCategory');
         const availableSubOptions = Array.from(subSelect.options).map(o => o.value);
         if (availableSubOptions.includes(t.subCategory)) {
@@ -340,7 +352,6 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicResourceUrl').value = t.resourceUrl || '';
         document.getElementById('topicNotes').value = t.notes || '';
 
-        // 3. Render existing attachment chips
         existingAttachments = t.attachments || [];
         renderAttachmentPreviews();
 
@@ -358,7 +369,6 @@ function setupTopicFormListeners(activeUser) {
     };
 }
 
-// Render attachment previews for loaded files
 function renderAttachmentPreviews() {
     const previewContainer = document.getElementById('attachmentPreviewList');
     if (!previewContainer) return;
