@@ -1,0 +1,44 @@
+<div class="space-y-6">
+    <div class="flex flex-col space-y-2 border-b border-zinc-800/80 pb-4">
+        <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">System Settings</h2>
+        <p class="text-sm text-zinc-400">Manage database infrastructure keys and catalog topic configurations.</p>
+    </div>
+    
+    <!-- Secondary Configuration Subpage Navigation Tabs -->
+    <div class="flex space-x-1 p-1 bg-zinc-900/80 rounded-xl max-w-md border border-zinc-800/40">
+        <button id="tab-user-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50">
+            Database Connection
+        </button>
+        <button id="tab-practice-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200">
+            Topic Management
+        </button>
+    </div>
+
+    <!-- SUBTAB PANEL VIEWPORT CONTAINER -->
+    <div id="config-subpage-container" class="mt-6">
+        <div class="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-6 space-y-4">
+            <div class="flex items-start space-x-3">
+                <span class="text-xl">🔑</span>
+                <div>
+                    <h3 class="text-sm font-bold text-zinc-200">Bring Your Own Firebase Backend</h3>
+                    <p class="text-xs text-zinc-400 mt-1 leading-relaxed">Paste your private web application snippet config. This creates a secure sandbox bypassing global data caps, providing unlimited localized execution hosting completely free of charge.</p>
+                </div>
+            </div>
+            
+            <div class="space-y-1.5 pt-2">
+                <label class="text-[11px] font-bold text-amber-500/80 tracking-wider uppercase">Firebase Web App Config JSON Object</label>
+                <textarea id="configJsonInput" rows="9" placeholder='{&#10;  "apiKey": "...",&#10;  "authDomain": "..."&#10;}' class="w-full bg-zinc-950 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500/50 shadow-inner leading-relaxed"></textarea>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <span id="connectionStatus" class="text-xs text-zinc-500 font-medium flex items-center space-x-2">
+                    <span class="h-2 w-2 rounded-full bg-zinc-700 animate-pulse"></span>
+                    <span id="statusMessageText">Awaiting configuration handshake...</span>
+                </span>
+                <button id="btnSaveConfig" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/5">
+                    Connect Personal Instance
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
