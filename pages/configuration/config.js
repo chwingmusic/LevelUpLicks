@@ -1,8 +1,7 @@
 import { gatewayAuth, gatewayDb } from '../../main.js';
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, deleteDoc, getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
-// System Default Dropdowns Schema
 const SYSTEM_DROPDOWNS_DEFAULT = {
     categories: {
         "Scale": ["Major / Minor", "Pentatonic", "Blues", "Diatonic Modes", "Symmetric", "Bebop"],
@@ -19,12 +18,15 @@ const SYSTEM_DROPDOWNS_DEFAULT = {
 
 let activeDropdowns = null;
 let activeTopicsList = [];
+let personalDb = null; // Will store the user's connected database instance
 
 export async function initPage() {
     const activeUser = gatewayAuth.currentUser;
     if (!activeUser) return;
 
-    // Tab Switching Handlers
+    // Resolve user's personal database instance
+    personalDb = await getPersonalDatabaseInstance(activeUser);
+
     const tabUser = document.getElementById('tab-user-config');
     const tabPractice = document.getElementById('tab-practice-config');
     const panelUser = document.getElementById('panel-user-config');
@@ -43,15 +45,32 @@ export async function initPage() {
         panelPractice.classList.remove('hidden');
         panelUser.classList.add('hidden');
 
-        await setupDropdownOptions(activeUser);
-        await renderTopicsCatalog(activeUser);
+        const dbToUse = personalDb || gatewayDb;
+        await setupDropdownOptions(activeUser, dbToUse);
+        await renderTopicsCatalog(activeUser, dbToUse);
     });
 
-    // 1. Setup Connection Handler
     setupConnectionTab(activeUser);
-
-    // 2. Form Actions Listener
     setupTopicFormListeners(activeUser);
+}
+
+// Fetch user's saved config and return a dedicated Firestore instance
+async function getPersonalDatabaseInstance(activeUser) {
+    try {
+        const snapshot = await getDoc(doc(gatewayDb, "user_configs", activeUser.uid));
+        if (snapshot.exists()) {
+            const configKeys = snapshot.data();
+            const existingApps = getApps();
+            let personalApp = existingApps.find(a => a.name === "userPersonalInstance");
+            if (!personalApp) {
+                personalApp = initializeApp(configKeys, "userPersonalInstance");
+            }
+            return getFirestore(personalApp);
+        }
+    } catch (e) {
+        console.error("Could not initialize personal DB instance, falling back:", e);
+    }
+    return gatewayDb;
 }
 
 // System Connection Handlers
@@ -81,7 +100,9 @@ async function setupConnectionTab(activeUser) {
             statusText.innerText = "Saving configuration parameters...";
             statusText.previousElementSibling.className = "h-2 w-2 rounded-full bg-amber-500 animate-pulse";
 
-            initializeApp(compiledKeys, "verificationInstance");
+            const personalApp = initializeApp(compiledKeys, "userPersonalInstance");
+            personalDb = getFirestore(personalApp);
+
             await setDoc(doc(gatewayDb, "user_configs", activeUser.uid), compiledKeys);
             
             statusText.innerText = "Database connection verified and registered!";
@@ -94,15 +115,14 @@ async function setupConnectionTab(activeUser) {
     });
 }
 
-// Fetch or Seed Dropdowns in Firebase
-async function setupDropdownOptions(activeUser) {
-    const dropdownDocRef = doc(gatewayDb, `users/${activeUser.uid}/settings`, "dropdown_options");
+// Fetch or Seed Dropdowns
+async function setupDropdownOptions(activeUser, db) {
+    const dropdownDocRef = doc(db, `users/${activeUser.uid}/settings`, "dropdown_options");
     try {
         const snap = await getDoc(dropdownDocRef);
         if (snap.exists()) {
             activeDropdowns = snap.data();
         } else {
-            // Seed defaults directly into user's Firebase
             await setDoc(dropdownDocRef, SYSTEM_DROPDOWNS_DEFAULT);
             activeDropdowns = JSON.parse(JSON.stringify(SYSTEM_DROPDOWNS_DEFAULT));
         }
@@ -115,7 +135,6 @@ async function setupDropdownOptions(activeUser) {
 }
 
 function populateSelectMenus() {
-    // Categories
     const catSelect = document.getElementById('topicCategory');
     catSelect.innerHTML = Object.keys(activeDropdowns.categories).map(c => `<option value="${c}">${c}</option>`).join('') + `<option value="OTHERS">+ Others (Custom)</option>`;
     
@@ -127,7 +146,6 @@ function populateSelectMenus() {
 
     updateSubCategories();
 
-    // Select options for Key, Mode, TimeSig, Tag
     fillSimpleSelect('topicKey', activeDropdowns.keys);
     fillSimpleSelect('topicMode', activeDropdowns.modes);
     fillSimpleSelect('topicTimeSig', activeDropdowns.timeSignatures);
@@ -156,13 +174,13 @@ function fillSimpleSelect(elementId, items) {
     el.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
 }
 
-// Render Topics Catalog from Firestore
-async function renderTopicsCatalog(activeUser) {
+// Render Topics Catalog
+async function renderTopicsCatalog(activeUser, db) {
     const container = document.getElementById('topicsContainer');
     const badge = document.getElementById('topicCountBadge');
 
     try {
-        const snap = await getDocs(collection(gatewayDb, `users/${activeUser.uid}/topics`));
+        const snap = await getDocs(collection(db, `users/${activeUser.uid}/topics`));
         activeTopicsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         badge.innerText = `${activeTopicsList.length} Items`;
 
@@ -204,7 +222,7 @@ async function renderTopicsCatalog(activeUser) {
     }
 }
 
-// Form Submission & Auto-Dropdown Memory
+// Form Submission Handler
 function setupTopicFormListeners(activeUser) {
     const form = document.getElementById('topicForm');
     const resetBtn = document.getElementById('btnResetForm');
@@ -219,16 +237,16 @@ function setupTopicFormListeners(activeUser) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const dbToUse = personalDb || gatewayDb;
+
         let category = document.getElementById('topicCategory').value;
         if (category === 'OTHERS') category = document.getElementById('topicCategoryCustom').value.trim();
 
         let subCategory = document.getElementById('topicSubCategory').value;
         if (subCategory === 'OTHERS') subCategory = document.getElementById('topicSubCategoryCustom').value.trim();
 
-        // Check & auto-persist custom dropdown entries into Firebase
-        await updateDropdownsWithCustomEntry(activeUser, category, subCategory);
+        await updateDropdownsWithCustomEntry(activeUser, dbToUse, category, subCategory);
 
-        // Convert attached files to base64 data URLs
         const filesInput = document.getElementById('topicFileInput');
         const attachments = [];
         for (let file of filesInput.files) {
@@ -253,18 +271,17 @@ function setupTopicFormListeners(activeUser) {
 
         const editingId = document.getElementById('editingTopicId').value;
         if (editingId) {
-            await updateDoc(doc(gatewayDb, `users/${activeUser.uid}/topics`, editingId), topicPayload);
+            await updateDoc(doc(dbToUse, `users/${activeUser.uid}/topics`, editingId), topicPayload);
         } else {
             topicPayload.createdAt = new Date().toISOString();
-            await addDoc(collection(gatewayDb, `users/${activeUser.uid}/topics`), topicPayload);
+            await addDoc(collection(dbToUse, `users/${activeUser.uid}/topics`), topicPayload);
         }
 
         form.reset();
         resetBtn.click();
-        await renderTopicsCatalog(activeUser);
+        await renderTopicsCatalog(activeUser, dbToUse);
     });
 
-    // Make global helper functions for inline card button clicks
     window.editTopic = (id) => {
         const t = activeTopicsList.find(x => x.id === id);
         if (!t) return;
@@ -291,14 +308,14 @@ function setupTopicFormListeners(activeUser) {
 
     window.deleteTopic = async (id) => {
         if (confirm("Are you sure you want to delete this topic?")) {
-            await deleteDoc(doc(gatewayDb, `users/${activeUser.uid}/topics`, id));
-            await renderTopicsCatalog(activeUser);
+            const dbToUse = personalDb || gatewayDb;
+            await deleteDoc(doc(dbToUse, `users/${activeUser.uid}/topics`, id));
+            await renderTopicsCatalog(activeUser, dbToUse);
         }
     };
 }
 
-// Auto-save new custom dropdown options to Firebase options document
-async function updateDropdownsWithCustomEntry(activeUser, category, subCategory) {
+async function updateDropdownsWithCustomEntry(activeUser, db, category, subCategory) {
     if (!activeDropdowns) return;
 
     let modified = false;
@@ -312,7 +329,7 @@ async function updateDropdownsWithCustomEntry(activeUser, category, subCategory)
     }
 
     if (modified) {
-        const dropdownDocRef = doc(gatewayDb, `users/${activeUser.uid}/settings`, "dropdown_options");
+        const dropdownDocRef = doc(db, `users/${activeUser.uid}/settings`, "dropdown_options");
         await setDoc(dropdownDocRef, activeDropdowns);
     }
 }
