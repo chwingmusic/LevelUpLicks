@@ -3,12 +3,13 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChang
 import { getFirestore, doc, getDoc } from "https://gstatic.com";
 
 const gatewayConfig = {
-    apiKey: "YOUR_MASTER_API_KEY",
-    authDomain: "YOUR_MASTER_AUTH_DOMAIN",
-    projectId: "YOUR_MASTER_PROJECT_ID",
-    storageBucket: "YOUR_MASTER_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MASTER_MESSAGING_SENDER_ID",
-    appId: "YOUR_MASTER_APP_ID"
+  apiKey: "AIzaSyAKVPuxFTzwn-KV4o4MqG893GozdWMejJY",
+  authDomain: "leveluplicks.firebaseapp.com",
+  projectId: "leveluplicks",
+  storageBucket: "leveluplicks.firebasestorage.app",
+  messagingSenderId: "878018571238",
+  appId: "1:878018571238:web:e59e38a2791280f2070427",
+  measurementId: "G-X3GP1C802L"
 };
 
 // Open System-Wide Gateway Pipelines
