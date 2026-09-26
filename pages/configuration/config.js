@@ -168,6 +168,11 @@ function populateSelectMenus() {
         updateSubCategories();
     });
 
+    const subSelect = document.getElementById('topicSubCategory');
+    subSelect.addEventListener('change', () => {
+        document.getElementById('topicSubCategoryCustom').classList.toggle('hidden', subSelect.value !== 'OTHERS');
+    });
+
     updateSubCategories();
 
     fillSimpleSelect('topicKey', activeDropdowns.keys);
@@ -179,6 +184,7 @@ function populateSelectMenus() {
 function updateSubCategories() {
     const catSelect = document.getElementById('topicCategory');
     const subSelect = document.getElementById('topicSubCategory');
+    const customSubInput = document.getElementById('topicSubCategoryCustom');
     const selectedCat = catSelect.value;
 
     if (selectedCat !== 'OTHERS' && activeDropdowns.categories[selectedCat]) {
@@ -188,9 +194,11 @@ function updateSubCategories() {
         subSelect.innerHTML = `<option value="OTHERS">+ Others (Custom)</option>`;
     }
 
-    subSelect.addEventListener('change', () => {
-        document.getElementById('topicSubCategoryCustom').classList.toggle('hidden', subSelect.value !== 'OTHERS');
-    });
+    // Automatically check whether the sub-category input box should be shown
+    const isSubOthers = subSelect.value === 'OTHERS';
+    if (customSubInput) {
+        customSubInput.classList.toggle('hidden', !isSubOthers);
+    }
 }
 
 function fillSimpleSelect(elementId, items) {
