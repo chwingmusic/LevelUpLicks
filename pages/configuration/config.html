@@ -4,29 +4,29 @@
         <p class="text-sm text-zinc-400">Manage database infrastructure keys and catalog topic configurations.</p>
     </div>
     
-    <!-- Secondary Configuration Subpage Navigation Tabs -->
+    <!-- Navigation Tabs -->
     <div class="flex space-x-1 p-1 bg-zinc-900/80 rounded-xl max-w-md border border-zinc-800/40">
-        <button id="tab-user-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50">
+        <button id="tab-user-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50 transition-all">
             Database Connection
         </button>
-        <button id="tab-practice-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200">
+        <button id="tab-practice-config" class="w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200 transition-all">
             Topic Management
         </button>
     </div>
 
-    <!-- SUBTAB PANEL VIEWPORT CONTAINER -->
-    <div id="config-subpage-container" class="mt-6">
+    <!-- SUBTAB 1: DATABASE CONNECTION PANEL -->
+    <div id="panel-user-config" class="space-y-4">
         <div class="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-6 space-y-4">
             <div class="flex items-start space-x-3">
                 <span class="text-xl">🔑</span>
                 <div>
                     <h3 class="text-sm font-bold text-zinc-200">Bring Your Own Firebase Backend</h3>
-                    <p class="text-xs text-zinc-400 mt-1 leading-relaxed">Paste your private web application snippet config. This creates a secure sandbox bypassing global data caps, providing unlimited localized execution hosting completely free of charge.</p>
+                    <p class="text-xs text-zinc-400 mt-1 leading-relaxed">Paste your private web application snippet config JSON object below.</p>
                 </div>
             </div>
             
             <div class="space-y-1.5 pt-2">
-                <label class="text-[11px] font-bold text-amber-500/80 tracking-wider uppercase">Firebase Web App Config JSON Object</label>
+                <label class="text-[11px] font-bold text-amber-500/80 tracking-wider uppercase">Firebase Web App Config JSON</label>
                 <textarea id="configJsonInput" rows="9" placeholder='{&#10;  "apiKey": "...",&#10;  "authDomain": "..."&#10;}' class="w-full bg-zinc-950 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500/50 shadow-inner leading-relaxed"></textarea>
             </div>
 
@@ -38,6 +38,104 @@
                 <button id="btnSaveConfig" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/5">
                     Connect Personal Instance
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUBTAB 2: TOPIC MANAGEMENT PANEL -->
+    <div id="panel-practice-config" class="hidden space-y-6">
+        <!-- Topic Creator / Editor Form Card -->
+        <div class="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+                <h3 id="formTitleText" class="text-base font-bold text-zinc-100 flex items-center space-x-2">
+                    <span>🎸</span> <span>Add New Practice Topic</span>
+                </h3>
+                <button id="btnResetForm" class="hidden text-xs text-amber-400 hover:underline">Cancel Editing</button>
+            </div>
+
+            <form id="topicForm" class="space-y-4">
+                <input type="hidden" id="editingTopicId" value="">
+
+                <!-- Title & Tag -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2 space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Topic Title *</label>
+                        <input type="text" id="topicTitle" required placeholder="e.g. A Dorian Legato Speed Drill" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500/50">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Routine Tag</label>
+                        <select id="topicTag" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                    </div>
+                </div>
+
+                <!-- Category & Sub-Category -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Category *</label>
+                        <select id="topicCategory" required class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                        <input type="text" id="topicCategoryCustom" placeholder="Type new custom category..." class="hidden mt-2 w-full bg-zinc-950 border border-amber-500/50 rounded-xl px-3.5 py-2 text-xs text-amber-300 focus:outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Sub-Category</label>
+                        <select id="topicSubCategory" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                        <input type="text" id="topicSubCategoryCustom" placeholder="Type new custom sub-category..." class="hidden mt-2 w-full bg-zinc-950 border border-amber-500/50 rounded-xl px-3.5 py-2 text-xs text-amber-300 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Musical Attributes (Key, Mode, Time Signature, Target Minutes) -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Key (Optional)</label>
+                        <select id="topicKey" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Mode (Optional)</label>
+                        <select id="topicMode" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Time Sig (Optional)</label>
+                        <select id="topicTimeSig" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Target (Mins)</label>
+                        <input type="number" id="topicTargetMins" min="1" max="300" placeholder="e.g. 15" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500/50">
+                    </div>
+                </div>
+
+                <!-- URL Resource & Notes -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Resource / Tutorial URL</label>
+                        <input type="url" id="topicResourceUrl" placeholder="https://youtube.com/watch?v=..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500/50">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Attach Sheet Music / Tabs</label>
+                        <input type="file" id="topicFileInput" multiple accept="image/*,.pdf" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-1.5 text-xs text-zinc-400 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-amber-500/10 file:text-amber-400">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Practice Notes & Instructions</label>
+                    <textarea id="topicNotes" rows="3" placeholder="Focus on light touch and clean string muting with palm..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50"></textarea>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button type="submit" id="btnSaveTopic" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/10">
+                        Save Practice Topic
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Registered Topics List Catalog -->
+        <div class="space-y-3">
+            <h3 class="text-sm font-bold text-zinc-200 flex items-center justify-between">
+                <span>Catalog Topics</span>
+                <span id="topicCountBadge" class="text-xs bg-zinc-800 border border-zinc-700/60 px-2.5 py-0.5 rounded-full text-amber-400 font-mono">0 Items</span>
+            </h3>
+
+            <div id="topicsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Dynamic topic cards injected here -->
             </div>
         </div>
     </div>
