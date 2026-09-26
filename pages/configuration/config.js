@@ -3,10 +3,11 @@ import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, deleteDoc,
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
 const SYSTEM_DROPDOWNS_DEFAULT = {
+    instruments: ["Electric Guitar", "Acoustic Guitar", "Bass Guitar", "Piano / Keys", "Drums", "Vocals", "Saxophone", "Violin"],
     categories: {
         "Scale": ["Major / Minor", "Pentatonic", "Blues", "Diatonic Modes", "Symmetric", "Bebop"],
         "Arpeggio": ["Triads", "7th Chords", "Extended (9th/11th)", "Sweep Shapes"],
-        "Technique": ["Alternate Picking", "Legato", "Sweeping", "Tapping", "Hybrid Picking", "Rhythm & Grooves", "Bending / Vibrato"],
+        "Technique": ["Alternate Picking", "Legato", "Sweeping", "Tapping", "Hybrid Picking", "Rhythm & Grooves", "Bending / Vibrato", "Rudiments", "Fingerstyle"],
         "Songs / Repertoire": ["Full Track", "Lick / Riff", "Solo", "Rhythm Part", "Intro / Outro"],
         "Theory & Ear": ["Chord Progression", "Interval Training", "Sight Reading", "Transcription"]
     },
@@ -30,7 +31,6 @@ export async function initPage() {
     const panelUser = document.getElementById('panel-user-config');
     const panelPractice = document.getElementById('panel-practice-config');
 
-    // Helper function to switch tabs
     const switchToUserTab = () => {
         tabUser.className = "w-full text-center py-2 text-xs font-semibold rounded-lg bg-zinc-800 text-amber-400 shadow-sm border border-zinc-700/50";
         tabPractice.className = "w-full text-center py-2 text-xs font-semibold rounded-lg text-zinc-400 hover:text-zinc-200";
@@ -49,14 +49,11 @@ export async function initPage() {
         await renderTopicsCatalog(activeUser, dbToUse);
     };
 
-    // Attach click listeners
     tabUser.addEventListener('click', switchToUserTab);
     tabPractice.addEventListener('click', switchToPracticeTab);
 
-    // Setup Connection & Load configuration check
     const hasConfiguredDb = await setupConnectionTab(activeUser);
 
-    // Smart Routing: If user already setup database, default to Topic Management!
     if (hasConfiguredDb) {
         await switchToPracticeTab();
     } else {
@@ -99,7 +96,6 @@ async function setupConnectionTab(activeUser) {
             statusText.innerText = "Personal Database Connection Synchronized.";
             statusText.previousElementSibling.className = "h-2 w-2 rounded-full bg-emerald-500";
             
-            // Initialize database instance for practice panel loading
             personalDb = await getPersonalDatabaseInstance(activeUser);
             hasConnection = true;
         }
@@ -141,6 +137,10 @@ async function setupDropdownOptions(activeUser, db) {
         const snap = await getDoc(dropdownDocRef);
         if (snap.exists()) {
             activeDropdowns = snap.data();
+            // Ensure instruments exists if user already initialized earlier version
+            if (!activeDropdowns.instruments) {
+                activeDropdowns.instruments = SYSTEM_DROPDOWNS_DEFAULT.instruments;
+            }
         } else {
             await setDoc(dropdownDocRef, SYSTEM_DROPDOWNS_DEFAULT);
             activeDropdowns = JSON.parse(JSON.stringify(SYSTEM_DROPDOWNS_DEFAULT));
@@ -154,6 +154,17 @@ async function setupDropdownOptions(activeUser, db) {
 }
 
 function populateSelectMenus() {
+    // Populate Instruments
+    const instSelect = document.getElementById('topicInstrument');
+    if (instSelect) {
+        instSelect.innerHTML = activeDropdowns.instruments.map(i => `<option value="${i}">${i}</option>`).join('') + `<option value="OTHERS">+ Others (Custom)</option>`;
+        instSelect.addEventListener('change', () => {
+            const isOthers = instSelect.value === 'OTHERS';
+            document.getElementById('topicInstrumentCustom')?.classList.toggle('hidden', !isOthers);
+        });
+    }
+
+    // Populate Categories
     const catSelect = document.getElementById('topicCategory');
     catSelect.innerHTML = Object.keys(activeDropdowns.categories).map(c => `<option value="${c}">${c}</option>`).join('') + `<option value="OTHERS">+ Others (Custom)</option>`;
     
@@ -190,7 +201,7 @@ function updateSubCategories() {
 
 function fillSimpleSelect(elementId, items) {
     const el = document.getElementById(elementId);
-    el.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
+    if (el) el.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
 }
 
 // Render Topics Catalog
@@ -216,7 +227,10 @@ async function renderTopicsCatalog(activeUser, db) {
             <div class="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-zinc-700/80 transition-all">
                 <div class="space-y-2">
                     <div class="flex items-start justify-between">
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">${t.tag}</span>
+                        <div class="flex items-center space-x-1.5">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">${t.tag}</span>
+                            ${t.instrument ? `<span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700">${t.instrument}</span>` : ''}
+                        </div>
                         <div class="flex space-x-1">
                             <button onclick="editTopic('${t.id}')" class="text-xs text-zinc-400 hover:text-amber-400 p-1">✏️</button>
                             <button onclick="deleteTopic('${t.id}')" class="text-xs text-zinc-400 hover:text-rose-400 p-1">🗑️</button>
@@ -256,6 +270,7 @@ function setupTopicFormListeners(activeUser) {
         }
         
         document.getElementById('editingTopicId').value = "";
+        document.getElementById('topicInstrumentCustom')?.classList.add('hidden');
         document.getElementById('topicCategoryCustom').classList.add('hidden');
         document.getElementById('topicSubCategoryCustom').classList.add('hidden');
         document.getElementById('formTitleText').innerHTML = "<span>🎸</span> <span>Add New Practice Topic</span>";
@@ -269,13 +284,16 @@ function setupTopicFormListeners(activeUser) {
 
         const dbToUse = personalDb || gatewayDb;
 
+        let instrument = document.getElementById('topicInstrument')?.value || 'Electric Guitar';
+        if (instrument === 'OTHERS') instrument = document.getElementById('topicInstrumentCustom').value.trim();
+
         let category = document.getElementById('topicCategory').value;
         if (category === 'OTHERS') category = document.getElementById('topicCategoryCustom').value.trim();
 
         let subCategory = document.getElementById('topicSubCategory').value;
         if (subCategory === 'OTHERS') subCategory = document.getElementById('topicSubCategoryCustom').value.trim();
 
-        await updateDropdownsWithCustomEntry(activeUser, dbToUse, category, subCategory);
+        await updateDropdownsWithCustomEntry(activeUser, dbToUse, instrument, category, subCategory);
 
         const filesInput = document.getElementById('topicFileInput');
         const newAttachments = [];
@@ -288,6 +306,7 @@ function setupTopicFormListeners(activeUser) {
 
         const topicPayload = {
             title: document.getElementById('topicTitle').value.trim(),
+            instrument: instrument,
             tag: document.getElementById('topicTag').value,
             category: category,
             subCategory: subCategory,
@@ -322,6 +341,20 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicTitle').value = t.title;
         document.getElementById('topicTag').value = t.tag;
 
+        // Populate Instrument field
+        const instSelect = document.getElementById('topicInstrument');
+        if (instSelect) {
+            if (activeDropdowns.instruments.includes(t.instrument)) {
+                instSelect.value = t.instrument;
+                document.getElementById('topicInstrumentCustom')?.classList.add('hidden');
+            } else {
+                instSelect.value = 'OTHERS';
+                document.getElementById('topicInstrumentCustom')?.classList.remove('hidden');
+                document.getElementById('topicInstrumentCustom').value = t.instrument || '';
+            }
+        }
+
+        // Populate Category field
         const catSelect = document.getElementById('topicCategory');
         if (activeDropdowns.categories[t.category]) {
             catSelect.value = t.category;
@@ -393,10 +426,15 @@ window.removeAttachment = (index) => {
     renderAttachmentPreviews();
 };
 
-async function updateDropdownsWithCustomEntry(activeUser, db, category, subCategory) {
+async function updateDropdownsWithCustomEntry(activeUser, db, instrument, category, subCategory) {
     if (!activeDropdowns) return;
 
     let modified = false;
+
+    if (instrument && !activeDropdowns.instruments.includes(instrument)) {
+        activeDropdowns.instruments.push(instrument);
+        modified = true;
+    }
 
     if (!activeDropdowns.categories[category]) {
         activeDropdowns.categories[category] = subCategory ? [subCategory] : [];
