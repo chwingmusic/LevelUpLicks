@@ -63,7 +63,6 @@ export async function initPage() {
     setupTopicFormListeners(activeUser);
 }
 
-// Fetch user's saved config and return a dedicated Firestore instance
 async function getPersonalDatabaseInstance(activeUser) {
     try {
         const snapshot = await getDoc(doc(gatewayDb, "user_configs", activeUser.uid));
@@ -82,7 +81,6 @@ async function getPersonalDatabaseInstance(activeUser) {
     return gatewayDb;
 }
 
-// System Connection Handlers
 async function setupConnectionTab(activeUser) {
     const inputArea = document.getElementById('configJsonInput');
     const statusText = document.getElementById('statusMessageText');
@@ -130,14 +128,12 @@ async function setupConnectionTab(activeUser) {
     return hasConnection;
 }
 
-// Fetch or Seed Dropdowns
 async function setupDropdownOptions(activeUser, db) {
     const dropdownDocRef = doc(db, `users/${activeUser.uid}/settings`, "dropdown_options");
     try {
         const snap = await getDoc(dropdownDocRef);
         if (snap.exists()) {
             activeDropdowns = snap.data();
-            // Ensure instruments exists if user already initialized earlier version
             if (!activeDropdowns.instruments) {
                 activeDropdowns.instruments = SYSTEM_DROPDOWNS_DEFAULT.instruments;
             }
@@ -154,7 +150,6 @@ async function setupDropdownOptions(activeUser, db) {
 }
 
 function populateSelectMenus() {
-    // Populate Instruments
     const instSelect = document.getElementById('topicInstrument');
     if (instSelect) {
         instSelect.innerHTML = activeDropdowns.instruments.map(i => `<option value="${i}">${i}</option>`).join('') + `<option value="OTHERS">+ Others (Custom)</option>`;
@@ -164,7 +159,6 @@ function populateSelectMenus() {
         });
     }
 
-    // Populate Categories
     const catSelect = document.getElementById('topicCategory');
     catSelect.innerHTML = Object.keys(activeDropdowns.categories).map(c => `<option value="${c}">${c}</option>`).join('') + `<option value="OTHERS">+ Others (Custom)</option>`;
     
@@ -204,7 +198,6 @@ function fillSimpleSelect(elementId, items) {
     if (el) el.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
 }
 
-// Render Topics Catalog
 async function renderTopicsCatalog(activeUser, db) {
     const container = document.getElementById('topicsContainer');
     const badge = document.getElementById('topicCountBadge');
@@ -255,7 +248,6 @@ async function renderTopicsCatalog(activeUser, db) {
     }
 }
 
-// Form Submission & Edit Handlers
 function setupTopicFormListeners(activeUser) {
     const form = document.getElementById('topicForm');
     const resetBtn = document.getElementById('btnResetForm');
@@ -341,7 +333,6 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicTitle').value = t.title;
         document.getElementById('topicTag').value = t.tag;
 
-        // Populate Instrument field
         const instSelect = document.getElementById('topicInstrument');
         if (instSelect) {
             if (activeDropdowns.instruments.includes(t.instrument)) {
@@ -354,7 +345,6 @@ function setupTopicFormListeners(activeUser) {
             }
         }
 
-        // Populate Category field
         const catSelect = document.getElementById('topicCategory');
         if (activeDropdowns.categories[t.category]) {
             catSelect.value = t.category;
