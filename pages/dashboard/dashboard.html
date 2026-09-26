@@ -1,0 +1,62 @@
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800/80 pb-4 gap-4">
+        <div>
+            <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Musician Dashboard</h2>
+            <p class="text-xs sm:text-sm text-zinc-400">Track practice consistency, velocity acceleration, and mastery metrics.</p>
+        </div>
+        <button id="btnQuickStartPractice" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center space-x-2">
+            <span>🎸</span> <span>Start Today's Session</span>
+        </button>
+    </div>
+
+    <!-- STATS OVERVIEW CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl relative overflow-hidden">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Active Practice Streak</div>
+            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">14 <span class="text-amber-400 text-lg">Days 🔥</span></div>
+            <p class="text-[11px] text-zinc-400 mt-2">Personal record: 21 days</p>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Total Hours Logged</div>
+            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">48.5 <span class="text-zinc-500 text-xs">hrs</span></div>
+            <p class="text-[11px] text-emerald-400 mt-2">↑ +4.2 hrs this week</p>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Max Speed Reached</div>
+            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">175 <span class="text-amber-400 text-xs">BPM</span></div>
+            <p class="text-[11px] text-zinc-400 mt-2">16th note Arpeggios</p>
+        </div>
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Mastered Topics</div>
+            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">12 / 16</div>
+            <p class="text-[11px] text-amber-400 mt-2">75% Completion Rate</p>
+        </div>
+    </div>
+
+    <!-- HEATMAP & ACCELERATION CHART -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
+            <h3 class="text-base font-bold text-zinc-200">30-Day Practice Consistency Heatmap</h3>
+            <div class="grid grid-cols-10 gap-2 pt-2" id="dashboardHeatmap">
+                <!-- Heatmap generated via JS -->
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/60">
+                <span>Less active</span>
+                <div class="flex items-center space-x-1">
+                    <span class="w-2.5 h-2.5 rounded bg-zinc-800"></span>
+                    <span class="w-2.5 h-2.5 rounded bg-amber-900/50"></span>
+                    <span class="w-2.5 h-2.5 rounded bg-amber-600/80"></span>
+                    <span class="w-2.5 h-2.5 rounded bg-amber-400"></span>
+                </div>
+                <span>Peak Shred</span>
+            </div>
+        </div>
+
+        <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
+            <h3 class="text-base font-bold text-zinc-200">Active Focus Topics</h3>
+            <div class="space-y-3" id="activeTopicsSummary">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </div>
+</div>
