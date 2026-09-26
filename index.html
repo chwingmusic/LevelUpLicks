@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LevelUpLicks — Elevate Your Practice</title>
+    <!-- Tailwind CSS Engine CDN -->
+    <script src="https://tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://googleapis.com">
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link href="https://googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-['Plus_Jakarta_Sans'] min-h-screen flex flex-col md:flex-row m-0 p-0 antialiased">
+
+    <!-- MASTER GATEWAY AUTH POPUP LAYER -->
+    <div id="authOverlay" class="fixed inset-0 bg-zinc-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                <span class="text-amber-400 font-bold text-lg">⚡</span>
+            </div>
+            <h2 class="text-2xl font-['Space_Grotesk'] font-bold text-white mb-2 tracking-tight">LevelUpLicks</h2>
+            <p class="text-zinc-400 text-xs leading-relaxed mb-6">Enter the laboratory. Securely sync your routines, tabs, and analytics across all personal equipment.</p>
+            <button id="btnLogin" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold tracking-wide text-sm py-3 px-4 rounded-xl transition-all shadow-lg shadow-amber-500/10">
+                Log In with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- STICKY APP SIDEBAR NAVIGATION -->
+    <aside class="w-full md:w-64 bg-zinc-900/60 backdrop-blur-xl border-b md:border-b-0 md:border-r border-zinc-800/80 flex flex-col justify-between shrink-0">
+        <div class="p-6">
+            <div class="flex items-center space-x-3 mb-8">
+                <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-['Space_Grotesk'] font-bold text-zinc-950 shadow-md shadow-amber-500/10">L</div>
+                <h1 class="text-lg font-['Space_Grotesk'] font-bold tracking-tight text-white">LevelUpLicks</h1>
+            </div>
+            <nav class="space-y-1.5">
+                <button data-page="dashboard" class="nav-link w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+                    <span>📊</span> <span>Dashboard</span>
+                </button>
+                <button data-page="practice" class="nav-link w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+                    <span>🎸</span> <span>Today's Practice</span>
+                </button>
+                <button data-page="configuration" class="nav-link w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+                    <span>⚙️</span> <span>Configuration</span>
+                </button>
+                <button data-page="tutorial" class="nav-link w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+                    <span>📖</span> <span>Tutorial Guide</span>
+                </button>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-zinc-800/60 bg-zinc-900/30 flex items-center justify-between">
+            <div class="flex items-center space-x-3 min-w-0">
+                <div id="userAvatar" class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-semibold text-amber-400 uppercase overflow-hidden"></div>
+                <div class="min-w-0">
+                    <p id="profileName" class="text-xs font-semibold text-zinc-200 truncate">Syncing...</p>
+                    <span class="text-[10px] text-amber-500/80 font-medium tracking-wide">Musician Profile</span>
+                </div>
+            </div>
+            <button id="btnLogout" class="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors" title="Sign Out">🚪</button>
+        </div>
+    </aside>
+
+    <!-- CONTENT DISPLAY ROUTER VIEWPORT OUTLET -->
+    <main id="view-router-outlet" class="flex-1 p-6 md:p-10 overflow-y-auto max-w-6xl w-full mx-auto">
+        <!-- Dynamic asynchronous page fragments injection point -->
+    </main>
+
+    <!-- Core App Module Scripts Loader -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
