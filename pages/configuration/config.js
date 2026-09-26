@@ -31,7 +31,16 @@ export async function initPage() {
     // Bind save button handler
     saveBtn.addEventListener('click', async () => {
         try {
-            const compiledKeys = JSON.parse(inputArea.value.trim());
+            // Replace this line in config.js:
+            // const compiledKeys = JSON.parse(inputArea.value.trim());
+            
+            // With this lenient parsing logic:
+            let rawInput = inputArea.value.trim();
+            
+            // Auto-add double quotes to unquoted JS keys if needed
+            if (!rawInput.startsWith('{')) rawInput = `{${rawInput}}`;
+            const jsonString = rawInput.replace(/([{,]\s*)([a-zA-Z0-9_$]+)\s*:/g, '$1"$2":');
+            const compiledKeys = JSON.parse(jsonString);
             statusText.innerText = "Saving configuration parameters...";
             if (statusText.parentElement && statusText.parentElement.firstElementChild) {
                 statusText.parentElement.firstElementChild.className = "h-2 w-2 rounded-full bg-amber-500 animate-pulse";
