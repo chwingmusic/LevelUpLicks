@@ -19,6 +19,7 @@ const SYSTEM_DROPDOWNS_DEFAULT = {
 let activeDropdowns = null;
 let activeTopicsList = [];
 let personalDb = null; // Will store the user's connected database instance
+let existingAttachments = []; // Stores existing base64 attachments during edit mode
 
 export async function initPage() {
     const activeUser = gatewayAuth.currentUser;
@@ -222,15 +223,27 @@ async function renderTopicsCatalog(activeUser, db) {
     }
 }
 
-// Form Submission Handler
+// Form Submission & Edit Handlers
 function setupTopicFormListeners(activeUser) {
     const form = document.getElementById('topicForm');
     const resetBtn = document.getElementById('btnResetForm');
+    const previewContainer = document.getElementById('attachmentPreviewList');
 
     resetBtn.addEventListener('click', () => {
         form.reset();
+        existingAttachments = [];
+        if (previewContainer) {
+            previewContainer.innerHTML = '';
+            previewContainer.classList.add('hidden');
+        }
+        
         document.getElementById('editingTopicId').value = "";
+        document.getElementById('topicCategoryCustom').classList.add('hidden');
+        document.getElementById('topicSubCategoryCustom').classList.add('hidden');
         document.getElementById('formTitleText').innerHTML = "<span>🎸</span> <span>Add New Practice Topic</span>";
+        
+        // Reset subcategory dropdown back to default category state
+        updateSubCategories();
         resetBtn.classList.add('hidden');
     });
 
@@ -247,12 +260,16 @@ function setupTopicFormListeners(activeUser) {
 
         await updateDropdownsWithCustomEntry(activeUser, dbToUse, category, subCategory);
 
+        // Process new file selection
         const filesInput = document.getElementById('topicFileInput');
-        const attachments = [];
+        const newAttachments = [];
         for (let file of filesInput.files) {
             const base64 = await fileToBase64(file);
-            attachments.push({ name: file.name, data: base64 });
+            newAttachments.push({ name: file.name, data: base64 });
         }
+
+        // Combine existing retained attachments with newly selected files
+        const finalAttachments = [...existingAttachments, ...newAttachments];
 
         const topicPayload = {
             title: document.getElementById('topicTitle').value.trim(),
@@ -265,7 +282,7 @@ function setupTopicFormListeners(activeUser) {
             targetMinutes: document.getElementById('topicTargetMins').value ? parseInt(document.getElementById('topicTargetMins').value) : null,
             resourceUrl: document.getElementById('topicResourceUrl').value.trim(),
             notes: document.getElementById('topicNotes').value.trim(),
-            attachments: attachments,
+            attachments: finalAttachments,
             updatedAt: new Date().toISOString()
         };
 
@@ -289,10 +306,31 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('editingTopicId').value = t.id;
         document.getElementById('topicTitle').value = t.title;
         document.getElementById('topicTag').value = t.tag;
-        document.getElementById('topicCategory').value = activeDropdowns.categories[t.category] ? t.category : 'OTHERS';
-        if (document.getElementById('topicCategory').value === 'OTHERS') {
+
+        // 1. Set Category and refresh available subcategory dropdown items
+        const catSelect = document.getElementById('topicCategory');
+        if (activeDropdowns.categories[t.category]) {
+            catSelect.value = t.category;
+            document.getElementById('topicCategoryCustom').classList.add('hidden');
+        } else {
+            catSelect.value = 'OTHERS';
             document.getElementById('topicCategoryCustom').classList.remove('hidden');
             document.getElementById('topicCategoryCustom').value = t.category;
+        }
+
+        // Rebuild subcategory options corresponding to selected category
+        updateSubCategories();
+
+        // 2. Select Sub-Category
+        const subSelect = document.getElementById('topicSubCategory');
+        const availableSubOptions = Array.from(subSelect.options).map(o => o.value);
+        if (availableSubOptions.includes(t.subCategory)) {
+            subSelect.value = t.subCategory;
+            document.getElementById('topicSubCategoryCustom').classList.add('hidden');
+        } else {
+            subSelect.value = 'OTHERS';
+            document.getElementById('topicSubCategoryCustom').classList.remove('hidden');
+            document.getElementById('topicSubCategoryCustom').value = t.subCategory || '';
         }
 
         document.getElementById('topicKey').value = t.key || '(None)';
@@ -302,8 +340,13 @@ function setupTopicFormListeners(activeUser) {
         document.getElementById('topicResourceUrl').value = t.resourceUrl || '';
         document.getElementById('topicNotes').value = t.notes || '';
 
+        // 3. Render existing attachment chips
+        existingAttachments = t.attachments || [];
+        renderAttachmentPreviews();
+
         document.getElementById('formTitleText').innerHTML = "<span>✏️</span> <span>Edit Practice Topic</span>";
         resetBtn.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     window.deleteTopic = async (id) => {
@@ -314,6 +357,31 @@ function setupTopicFormListeners(activeUser) {
         }
     };
 }
+
+// Render attachment previews for loaded files
+function renderAttachmentPreviews() {
+    const previewContainer = document.getElementById('attachmentPreviewList');
+    if (!previewContainer) return;
+
+    if (!existingAttachments || existingAttachments.length === 0) {
+        previewContainer.innerHTML = '';
+        previewContainer.classList.add('hidden');
+        return;
+    }
+
+    previewContainer.classList.remove('hidden');
+    previewContainer.innerHTML = existingAttachments.map((file, idx) => `
+        <span class="inline-flex items-center space-x-1.5 text-[11px] bg-zinc-800 text-amber-300 border border-zinc-700/80 px-2.5 py-1 rounded-lg">
+            <span>📄 ${file.name}</span>
+            <button type="button" onclick="removeAttachment(${idx})" class="text-zinc-400 hover:text-rose-400 font-bold ml-1">✕</button>
+        </span>
+    `).join('');
+}
+
+window.removeAttachment = (index) => {
+    existingAttachments.splice(index, 1);
+    renderAttachmentPreviews();
+};
 
 async function updateDropdownsWithCustomEntry(activeUser, db, category, subCategory) {
     if (!activeDropdowns) return;
