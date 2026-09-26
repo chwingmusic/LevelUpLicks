@@ -12,8 +12,8 @@ const gatewayConfig = {
     measurementId: "G-X3GP1C802L"
 };
 
-// Open System-Wide Gateway Pipelines
-export const gatewayApp = initializeApp(gatewayConfig, "gatewayInstance");
+// Open System-Wide Gateway Pipelines (Default App Instance)
+export const gatewayApp = initializeApp(gatewayConfig);
 export const gatewayAuth = getAuth(gatewayApp);
 export const gatewayDb = getFirestore(gatewayApp);
 
@@ -55,18 +55,25 @@ export async function loadViewRouter(routeKey) {
     }
 }
 
-// Global Auth Handlers
+// Global Auth State Observer
 onAuthStateChanged(gatewayAuth, async (activeUser) => {
     const authOverlay = document.getElementById('authOverlay');
     if (activeUser) {
         authOverlay.classList.add('hidden');
         document.getElementById('profileName').innerText = activeUser.displayName || activeUser.email;
-        if (activeUser.photoURL) document.getElementById('userAvatar').innerHTML = `<img src="${activeUser.photoURL}" class="w-full h-full object-cover">`;
+        if (activeUser.photoURL) {
+            document.getElementById('userAvatar').innerHTML = `<img src="${activeUser.photoURL}" class="w-full h-full object-cover">`;
+        }
         
-        const snapshot = await getDoc(doc(gatewayDb, "user_configs", activeUser.uid));
-        if (snapshot.exists()) {
-            loadViewRouter('dashboard');
-        } else {
+        try {
+            const snapshot = await getDoc(doc(gatewayDb, "user_configs", activeUser.uid));
+            if (snapshot.exists()) {
+                loadViewRouter('dashboard');
+            } else {
+                loadViewRouter('configuration');
+            }
+        } catch (e) {
+            console.error("Config fetch error:", e);
             loadViewRouter('configuration');
         }
     } else {
@@ -74,8 +81,31 @@ onAuthStateChanged(gatewayAuth, async (activeUser) => {
     }
 });
 
+// Sidebar Navigation Action Listeners
 document.querySelectorAll('.nav-link').forEach(btn => {
     btn.addEventListener('click', (e) => {
         loadViewRouter(e.currentTarget.getAttribute('data-page'));
     });
 });
+
+// Login Button Listener
+const btnLogin = document.getElementById('btnLogin');
+if (btnLogin) {
+    btnLogin.addEventListener('click', async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(gatewayAuth, provider);
+        } catch (error) {
+            console.error("Google Auth Failure:", error);
+            alert(`Sign-in failed: ${error.message}`);
+        }
+    });
+}
+
+// Logout Button Listener
+const btnLogout = document.getElementById('btnLogout');
+if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+        signOut(gatewayAuth).then(() => location.reload());
+    });
+}
