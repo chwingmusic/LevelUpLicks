@@ -1,5 +1,6 @@
 import { gatewayAuth, gatewayDb, loadViewRouter } from '../../main.js';
-import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, query, getDoc, doc, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 let userPracticeLogs = [];
 let activeCalendarDate = new Date();
@@ -14,14 +15,36 @@ export async function initPage() {
     applyPresetRange('this_month');
 }
 
-// 1. Fetch real session logs from the personal user DB path
+// 1. Helper to retrieve or initialize the user's personal Firebase/Firestore instance
+async function getPersonalDatabaseInstance(user) {
+    try {
+        const snapshot = await getDoc(doc(gatewayDb, "user_configs", user.uid));
+        if (snapshot.exists()) {
+            const configKeys = snapshot.data();
+            const existingApps = getApps();
+            let personalApp = existingApps.find(a => a.name === "userPersonalInstance");
+            if (!personalApp) {
+                personalApp = initializeApp(configKeys, "userPersonalInstance");
+            }
+            return getFirestore(personalApp);
+        }
+    } catch (e) {
+        console.error("Personal DB Error:", e);
+    }
+    return gatewayDb;
+}
+
+// 2. Fetch practice logs from the personal DB instance
 async function fetchUserLogs() {
     const user = gatewayAuth.currentUser;
     if (!user) return;
 
     try {
-        // Query the user's personal practice_logs subcollection
-        const logsRef = collection(gatewayDb, "users", user.uid, "practice_logs");
+        // Retrieve personal Firestore instance
+        const db = await getPersonalDatabaseInstance(user);
+
+        // Fetch logs directly from the personal instance's practice_logs collection
+        const logsRef = collection(db, "practice_logs");
         const q = query(
             logsRef, 
             orderBy("date", "desc")
@@ -44,7 +67,7 @@ async function fetchUserLogs() {
             });
         });
     } catch (err) {
-        console.error("Error loading Firestore practice logs:", err);
+        console.error("Error loading practice logs from personal DB:", err);
     }
 }
 
@@ -148,26 +171,25 @@ function renderDashboard() {
         return logDate >= start && logDate <= end;
     });
 
-    // 2. Prior Period Logs (Same length in days)
+    // 2. Prior Period Logs
     const periodDurationMs = end.getTime() - start.getTime();
     const priorStart = new Date(start.getTime() - periodDurationMs);
-    const priorEnd = new Date(start.getTime() - 1); // Up to 1 millisecond before current start
+    const priorEnd = new Date(start.getTime() - 1);
 
     const priorLogs = userPracticeLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= priorStart && logDate <= priorEnd;
     });
 
-    // 3. Render Metric Cards
+    // 3. Metrics
     renderTimeMetric(filteredLogs, priorLogs);
     calculateStreak(filteredLogs);
 
-    // 4. Render Breakdown & Calendar
+    // 4. Visual Components
     renderCategoryCards(filteredLogs);
     renderCalendarGrid();
 }
 
-// Computes real total time and percentage change vs prior period
 function renderTimeMetric(currentLogs, priorLogs) {
     const currentMins = currentLogs.reduce((acc, curr) => acc + curr.minutes, 0);
     const priorMins = priorLogs.reduce((acc, curr) => acc + curr.minutes, 0);
@@ -196,9 +218,8 @@ function renderTimeMetric(currentLogs, priorLogs) {
     }
 }
 
-// Calculates active consecutive streak and practice frequency within selected range
 function calculateStreak(filteredLogs) {
-    const streakSubtextEl = document.querySelector('#statActiveStreak').parentElement.nextElementSibling;
+    const streakSubtextEl = document.querySelector('#statActiveStreak')?.parentElement?.nextElementSibling;
     
     if (userPracticeLogs.length === 0) {
         const streakEl = document.getElementById('statActiveStreak');
@@ -207,7 +228,6 @@ function calculateStreak(filteredLogs) {
         return;
     }
 
-    // Active continuous streak from present day
     const uniqueDates = [...new Set(userPracticeLogs.map(l => l.date))].sort().reverse();
     let streak = 0;
     let checkDate = new Date();
@@ -228,7 +248,6 @@ function calculateStreak(filteredLogs) {
     const streakEl = document.getElementById('statActiveStreak');
     if (streakEl) streakEl.innerText = streak;
 
-    // Calculate dynamic active days in currently selected range
     const rangeActiveDays = new Set(filteredLogs.map(l => l.date)).size;
     if (streakSubtextEl) {
         streakSubtextEl.innerText = `Practiced on ${rangeActiveDays} distinct day${rangeActiveDays === 1 ? '' : 's'} in this range`;
