@@ -142,23 +142,60 @@ async function triggerMobileGoogleLogin() {
     });
 }
 
-// Login Button Listener
+// Function to detect in-app webviews (WhatsApp, Instagram, FB, Line, WeChat)
+function isInAppBrowser() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    return /FBAN|FBAV|Instagram|WhatsApp|Line|MicroMessenger|LinkedInApp/i.test(ua);
+}
+
 const btnLogin = document.getElementById('btnLogin');
+
 if (btnLogin) {
-    btnLogin.addEventListener('click', async () => {
-        if (isMobileDevice()) {
-            await triggerMobileGoogleLogin();
-        } else {
-            try {
-                const provider = new GoogleAuthProvider();
-                provider.setCustomParameters({ prompt: 'select_account' });
-                await signInWithPopup(gatewayAuth, provider);
-            } catch (error) {
-                console.warn("Popup blocked, trying Mobile GIS auth:", error);
-                await triggerMobileGoogleLogin();
-            }
+    // Add touchstart listener alongside click for immediate mobile response
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        
+        // Prevent double triggers if both touchstart and click fire
+        if (btnLogin.dataset.processing === "true") return;
+        btnLogin.dataset.processing = "true";
+
+        // Show immediate visual loading state on mobile
+        const originalText = btnLogin.innerText;
+        btnLogin.innerText = "Connecting...";
+        btnLogin.style.opacity = "0.6";
+
+        // Check for WebViews (WhatsApp / IG) where popups are blocked silently
+        if (isInAppBrowser()) {
+            alert("In-app browsers (like WhatsApp/Instagram) block Google login. Please tap the menu button (...) and select 'Open in Safari' or 'Open in Chrome'.");
+            resetButton(originalText);
+            return;
         }
-    });
+
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+
+        try {
+            await signInWithPopup(gatewayAuth, provider);
+        } catch (error) {
+            console.error("Mobile login error:", error);
+            
+            if (error.code === 'auth/popup-blocked') {
+                alert("Popup was blocked by your browser. Please allow popups for this site or open in standard Safari/Chrome.");
+            } else if (error.code !== 'auth/popup-closed-by-user') {
+                alert(`Login failed: ${error.message}`);
+            }
+        } finally {
+            resetButton(originalText);
+        }
+    };
+
+    function resetButton(text) {
+        btnLogin.innerText = text;
+        btnLogin.style.opacity = "1";
+        btnLogin.dataset.processing = "false";
+    }
+
+    btnLogin.addEventListener('click', handleLogin);
 }
 
 // Logout Button Listener
