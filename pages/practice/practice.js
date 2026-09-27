@@ -557,42 +557,67 @@ function updateTimerDisplay() {
     document.getElementById('focusTimerDisplay').innerText = `${mins}:${secs}`;
 }
 
-let currentActiveFeatureInstance = null;
+let currentActiveFeatures = []; // Track active feature instances for cleanup
 
 async function loadInstrumentFeatures(instrument, topicTag) {
     const container = document.getElementById('dynamicFeatureContainer');
     if (!container) return;
     
-    // Clean up previous module instance
-    if (currentActiveFeatureInstance && typeof currentActiveFeatureInstance.destroy === 'function') {
-        currentActiveFeatureInstance.destroy();
-        currentActiveFeatureInstance = null;
-    }
-
+    // 1. Clean up all running feature modules (stops mic stream & audio nodes)
+    currentActiveFeatures.forEach(feature => {
+        if (feature && typeof feature.destroy === 'function') {
+            feature.destroy();
+        }
+    });
+    currentActiveFeatures = [];
     container.innerHTML = ''; 
 
-    // Normalize string: lowercase and trim whitespace
+    // Normalize strings for matching
     const normInst = (instrument || '').trim().toLowerCase();
     const normTag = (topicTag || '').trim().toLowerCase();
 
     try {
-        // Broadened vocal match to catch "Vocals", "Vocal", "Voice", "Singing", etc.
+        // --- VOCALS: Load BOTH Pitch Pipe AND Live Pitch Detector Graph ---
         if (['vocals', 'vocal', 'voice', 'singing'].includes(normInst)) {
-            const { PitchPipeFeature } = await import('../../features/pitchPipe.js');
-            currentActiveFeatureInstance = new PitchPipeFeature(container);
-            currentActiveFeatureInstance.render();
+            // Create two dedicated wrapper slots
+            const pitchPipeSlot = document.createElement('div');
+            pitchPipeSlot.className = 'mb-4';
+            const pitchGraphSlot = document.createElement('div');
 
+            container.appendChild(pitchPipeSlot);
+            container.appendChild(pitchGraphSlot);
+
+            // Import both features concurrently
+            const [{ PitchPipeFeature }, { PitchGraphFeature }] = await Promise.all([
+                import('../../features/pitchPipe.js'),
+                import('../../features/pitchGraph.js')
+            ]);
+
+            const pitchPipeInstance = new PitchPipeFeature(pitchPipeSlot);
+            pitchPipeInstance.render();
+
+            const pitchGraphInstance = new PitchGraphFeature(pitchGraphSlot);
+            pitchGraphInstance.render();
+
+            currentActiveFeatures.push(pitchPipeInstance, pitchGraphInstance);
+
+        // --- GUITARS: Load Tuner Feature ---
         } else if (['electric guitar', 'acoustic guitar', 'bass guitar', 'guitar', 'bass'].includes(normInst)) {
             const { GuitarTunerFeature } = await import('../../features/guitarTuner.js');
-            currentActiveFeatureInstance = new GuitarTunerFeature(container);
-            currentActiveFeatureInstance.render();
+            const tunerInstance = new GuitarTunerFeature(container);
+            tunerInstance.render();
+            
+            currentActiveFeatures.push(tunerInstance);
 
+        // --- OTHER / SPECIFIC TAGS ---
         } else if (normTag === 'scale pitch analysis') {
             const { PitchGraphFeature } = await import('../../features/pitchGraph.js');
-            currentActiveFeatureInstance = new PitchGraphFeature(container);
-            currentActiveFeatureInstance.render();
+            const graphInstance = new PitchGraphFeature(container);
+            graphInstance.render();
+
+            currentActiveFeatures.push(graphInstance);
         }
     } catch (err) {
-        console.error("Failed to load feature module:", err);
+        console.error("Failed to load instrument features:", err);
     }
 }
