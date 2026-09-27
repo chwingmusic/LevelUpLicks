@@ -10,7 +10,7 @@
             📖 Bring Your Own Database (BYODB) Guide
         </h1>
         <p class="text-sm text-zinc-400 mt-1 max-w-2xl">
-            Never lose your practice data! Follow this beginner-friendly step-by-step guide to connect your own free Google Firebase database in less than 5 minutes. No coding required.
+            Never lose your practice data! Follow this step-by-step guide to connect your personal free Google Firebase database in less than 5 minutes.
         </p>
     </div>
 
@@ -29,11 +29,11 @@
         </div>
 
         <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
-            <li>Click the button above to go to <strong>firebase.google.com</strong> and sign in using your regular Google/Gmail account.</li>
-            <li>Click the big blue <strong>"+ Add project"</strong> (or "Create a project") button.</li>
-            <li>Type <code>LevelUpLicks</code> (or any name you like) as your Project Name, then click <strong>Continue</strong>.</li>
-            <li><strong>Disable Google Analytics</strong> for this project (you don't need it), then click <strong>Create Project</strong>.</li>
-            <li>Wait a few seconds for Firebase to setup your project, then click <strong>Continue</strong> when it says "Your new project is ready".</li>
+            <li>Click the button above to open <strong>firebase.google.com</strong> and sign in with your Google account.</li>
+            <li>Click <strong>"+ 新增專案" (+ Add project)</strong>.</li>
+            <li>Name your project <code>LevelUpLicks</code> and click <strong>繼續 (Continue)</strong>.</li>
+            <li>Disable Google Analytics (not needed), then click <strong>建立專案 (Create project)</strong>.</li>
+            <li>Click <strong>繼續 (Continue)</strong> once the project is ready.</li>
         </ol>
     </div>
 
@@ -43,20 +43,21 @@
             <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
                 02
             </span>
-            <h2 class="text-base font-bold text-white">Register a Web App & Copy API Keys</h2>
+            <h2 class="text-base font-bold text-white">Register Web App & Copy Config JSON</h2>
         </div>
 
         <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
-            <li>On your Project Overview page, click the circular <strong>Web icon (<code>&lt;/&gt;</code>)</strong> under "Get started by adding Firebase to your app".</li>
-            <li>Type <code>LevelUpLicks Web</code> in the "App nickname" box. (Leave "Firebase Hosting" unchecked).</li>
-            <li>Click <strong>Register app</strong>.</li>
-            <li>You will now see a box with code labeled <code>const firebaseConfig = { ... };</code>.</li>
-            <li>Copy **ONLY** the Javascript object portion between the curly braces `{ ... }` as shown below:</li>
+            <li>On the Project Overview page (專案總覽), look right under your project title at the top.</li>
+            <li>Click the <strong>"＋ 新增應用程式" (+ Add app)</strong> button.</li>
+            <li>Select the <strong>Web icon (<code>&lt;/&gt;</code>)</strong>.</li>
+            <li>Type <code>LevelUpLicks App</code> into the App nickname box and click <strong>註冊應用程式 (Register app)</strong>.</li>
+            <li>You will see a code snippet block containing <code>const firebaseConfig = { ... };</code>.</li>
+            <li>Copy <strong>ONLY</strong> the JSON object block inside `{ ... }` as shown below:</li>
         </ol>
 
         <!-- Visual Code Example -->
         <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs text-amber-300/90 space-y-1 relative">
-            <div class="text-[10px] text-zinc-500 uppercase font-sans font-bold mb-2">Example of what to copy:</div>
+            <div class="text-[10px] text-zinc-500 uppercase font-sans font-bold mb-2">Copy this exact format:</div>
             <div>{</div>
             <div class="pl-4">"apiKey": "AIzaSyD-EXAMPLE_KEY_HERE_12345",</div>
             <div class="pl-4">"authDomain": "your-app.firebaseapp.com",</div>
@@ -74,19 +75,20 @@
             <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
                 03
             </span>
-            <h2 class="text-base font-bold text-white">Enable Cloud Firestore Database</h2>
+            <h2 class="text-base font-bold text-white">Enable Firestore Database</h2>
         </div>
 
         <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
-            <li>On the left sidebar of your Firebase Console, click <strong>Build</strong> ➔ <strong>Firestore Database</strong>.</li>
-            <li>Click the <strong>Create database</strong> button.</li>
-            <li>Choose a location closest to you (e.g., <code>asia-east1</code> or <code>us-central</code>) and click <strong>Next</strong>.</li>
-            <li>Select <strong>Start in test mode</strong> (this lets your practice app read and write data immediately), then click <strong>Create</strong>.</li>
+            <li>On the left navigation panel, click on <strong>資料庫和儲存空間 (Database & Storage)</strong>.</li>
+            <li>Click <strong>Firestore</strong> (or click <strong>Firestore</strong> directly under 專案快捷 Shortcuts).</li>
+            <li>Click <strong>建立資料庫 (Create database)</strong>.</li>
+            <li>Keep default region settings and click <strong>下一步 (Next)</strong>.</li>
+            <li>Select <strong>以測試模式啟動 (Start in test mode)</strong>, then click <strong>建立 (Create)</strong>.</li>
         </ol>
 
         <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300 flex items-start gap-2">
             <span>💡</span>
-            <span><strong>Pro Tip:</strong> To keep your database open permanently without 30-day expiration warnings, go to the <strong>Rules</strong> tab inside Firestore and set <code>allow read, write: if true;</code> then click <strong>Publish</strong>.</span>
+            <span><strong>Tip:</strong> To prevent Firebase from locking your database after 30 days, go to the <strong>規則 (Rules)</strong> tab inside Firestore and change the rule line to <code>allow read, write: if true;</code>, then click <strong>發布 (Publish)</strong>.</span>
         </div>
     </div>
 
@@ -96,14 +98,14 @@
             <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
                 04
             </span>
-            <h2 class="text-base font-bold text-white">Paste JSON into LevelUpLicks Configuration</h2>
+            <h2 class="text-base font-bold text-white">Paste into LevelUpLicks Configuration</h2>
         </div>
 
         <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
-            <li>Click on the <strong>Configuration</strong> page on the left menu of this app.</li>
-            <li>Paste the copied `{ "apiKey": ... }` JSON block directly into the text area.</li>
+            <li>Return to this app and click <strong>Configuration</strong> in the left menu.</li>
+            <li>Paste your copied `{ "apiKey": ... }` JSON block into the text box.</li>
             <li>Click <strong>Connect Personal Instance</strong>.</li>
-            <li>You're all set! Your practice logs and routines will now save directly into your private Google database! 🎉</li>
+            <li>Done! All your practice sessions, routines, and stats are now saved directly in your personal cloud database. 🚀</li>
         </ol>
     </div>
 </div>
