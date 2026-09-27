@@ -60,39 +60,40 @@ async function getPersonalDatabaseInstance(user) {
 
 async function setupInstrumentOptions() {
     const instSelect = document.getElementById('practiceInstrumentSelect');
+    const dbToUse = personalDb || gatewayDb;
     
-    // Path to user settings
-    const settingsRef = doc(personalDb || gatewayDb, `users/${activeUser.uid}/settings`, "practice_config");
-    const fallbackRef = doc(personalDb || gatewayDb, `users/${activeUser.uid}/settings`, "dropdown_options");
-    
-    let userInstruments = [];
+    let detectedInstruments = [];
 
     try {
-        // 1. Try reading the user's explicit practice configuration
-        const snap = await getDoc(settingsRef);
-        if (snap.exists() && snap.data().activeInstruments && snap.data().activeInstruments.length > 0) {
-            userInstruments = snap.data().activeInstruments;
-        } else {
-            // 2. Fallback to general dropdown options if practice_config isn't set
-            const fallbackSnap = await getDoc(fallbackRef);
-            if (fallbackSnap.exists() && fallbackSnap.data().instruments && fallbackSnap.data().instruments.length > 0) {
-                userInstruments = fallbackSnap.data().instruments;
+        // 1. Fetch all topics from the user's catalog
+        const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
+        
+        // 2. Extract unique instrument values across all topic entries
+        const instrumentSet = new Set();
+        snap.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            if (data.instrument && data.instrument.trim() !== '') {
+                instrumentSet.add(data.instrument.trim());
             }
-        }
+        });
+
+        detectedInstruments = Array.from(instrumentSet).sort();
     } catch (e) {
-        console.error("Error fetching user instrument config:", e);
+        console.error("Error detecting instruments from topic catalog:", e);
     }
 
-    // 3. Fallback default if no configuration is found in DB
-    if (userInstruments.length === 0) {
-        userInstruments = ["Electric Guitar"];
+    // 3. Fallback default if no topics exist yet
+    if (detectedInstruments.length === 0) {
+        detectedInstruments = ["Electric Guitar"];
     }
 
-    // Populate ONLY the user's configured instruments
-    instSelect.innerHTML = userInstruments.map(i => `<option value="${i}">${i}</option>`).join('');
+    // 4. Render only the detected instruments in the selector
+    instSelect.innerHTML = detectedInstruments.map(inst => `<option value="${inst}">${inst}</option>`).join('');
+    
+    // 5. Default to the first detected instrument
     currentInstrument = instSelect.value;
 
-    // Trigger load when switching between configured instruments
+    // 6. Reload practice deck when switching instrument
     instSelect.addEventListener('change', async () => {
         currentInstrument = instSelect.value;
         await loadDailySession();
