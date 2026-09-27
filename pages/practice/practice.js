@@ -347,12 +347,12 @@ window.openFocusModal = async (cardId) => {
     // Render Attachments
     const resContainer = document.getElementById('focusResourcesContainer');
     resContainer.innerHTML = `
-        ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
+        ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
         ${activeCardEditing.attachments && activeCardEditing.attachments.length > 0 ? `
             <div class="space-y-1">
                 <strong>Attachments:</strong>
                 <div class="flex flex-wrap gap-2">
-                    ${activeCardEditing.attachments.map(a => `<a href="${a.data}" download="${a.name}" class="bg-zinc-800 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px]">📄 ${a.name}</a>`).join('')}
+                    ${activeCardEditing.attachments.map(a => `<a href="${a.data}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px]">📄 ${a.name}</a>`).join('')}
                 </div>
             </div>
         ` : ''}
