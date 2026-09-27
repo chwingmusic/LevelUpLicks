@@ -1,87 +1,170 @@
-<div class="space-y-6">
-    <div class="flex flex-col space-y-1 border-b border-zinc-800/80 pb-4">
-        <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Today's Practice Laboratory</h2>
-        <p class="text-xs text-zinc-400">Interactive tempo generator, stopwatch, and precision velocity logging tool.</p>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- METRONOME & TIMER CONTROL SUITE -->
-        <div class="lg:col-span-5 space-y-6">
-            <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-5 text-center">
-                <span class="text-[10px] font-bold tracking-widest text-amber-500 uppercase">Precision Audio Metronome</span>
-                
-                <div class="py-2">
-                    <div id="metronomeBpmDisplay" class="text-6xl font-['Space_Grotesk'] font-bold text-white tracking-tight">120</div>
-                    <p class="text-xs text-zinc-500 mt-1">Beats Per Minute</p>
-                </div>
-
-                <div class="space-y-2">
-                    <input id="bpmSlider" type="range" min="40" max="240" value="120" class="w-full accent-amber-500 bg-zinc-800 h-2 rounded-lg cursor-pointer">
-                    <div class="flex justify-between text-[10px] text-zinc-500 font-mono">
-                        <span>40 BPM</span>
-                        <span>140 BPM</span>
-                        <span>240 BPM</span>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-center space-x-3 pt-2">
-                    <button id="btnBpmMinus" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 w-10 h-10 rounded-xl font-bold text-lg">-</button>
-                    <button id="btnToggleMetronome" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-sm px-8 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20">
-                        Start Metronome ▶
-                    </button>
-                    <button id="btnBpmPlus" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 w-10 h-10 rounded-xl font-bold text-lg">+</button>
-                </div>
-            </div>
-
-            <!-- STOPWATCH TIMER -->
-            <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl flex items-center justify-between">
-                <div>
-                    <span class="text-[10px] font-bold uppercase text-zinc-500">Session Clock</span>
-                    <div id="timerDisplay" class="text-2xl font-mono font-bold text-amber-400">00:00:00</div>
-                </div>
-                <button id="btnToggleTimer" class="bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 px-4 py-2 rounded-xl border border-zinc-700">
-                    Start Clock
-                </button>
-            </div>
-        </div>
-
-        <!-- PRACTICE LOG FORM -->
-        <div class="lg:col-span-7 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
-            <h3 class="text-base font-bold text-white">Log Executed Exercise / Lick</h3>
-            
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs font-bold text-zinc-400">Select Practice Topic</label>
-                    <select id="practiceTopicSelect" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500">
+<div class="space-y-6 max-w-7xl mx-auto pb-12">
+    <!-- Top Control Header -->
+    <div class="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4 md:p-6 backdrop-blur-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <!-- Left: Title & Instrument Switcher -->
+            <div class="space-y-1">
+                <div class="flex items-center space-x-3">
+                    <h1 class="text-xl font-bold text-white tracking-tight">Today's Practice</h1>
+                    <select id="practiceInstrumentSelect" class="bg-zinc-950 border border-amber-500/30 text-amber-400 font-semibold text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-amber-500">
                         <!-- Populated dynamically -->
                     </select>
                 </div>
+                <p class="text-xs text-zinc-400">Select an instrument and manage your daily practice routine cards.</p>
+            </div>
 
-                <div class="grid grid-cols-2 gap-3">
+            <!-- Right: Date Picker & Daily Stats -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center space-x-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5">
+                    <span class="text-xs text-zinc-400">🗓️ Date:</span>
+                    <input type="date" id="practiceDatePicker" class="bg-transparent text-xs text-white focus:outline-none">
+                </div>
+                
+                <div class="bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-3 py-1.5 flex items-center space-x-3 text-xs">
                     <div>
-                        <label class="text-xs font-bold text-zinc-400">Clean Reached BPM</label>
-                        <input id="logBpmInput" type="number" value="120" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500 font-mono">
+                        <span class="text-zinc-400">Topics: </span>
+                        <span id="statCompletedCount" class="font-bold text-amber-400">0/0</span>
                     </div>
+                    <div class="h-3 w-[1px] bg-zinc-700"></div>
                     <div>
-                        <label class="text-xs font-bold text-zinc-400">Cleanliness Rating</label>
-                        <select id="logRating" class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500">
-                            <option value="5">⭐⭐⭐⭐⭐ Effortless</option>
-                            <option value="4">⭐⭐⭐⭐ Solid</option>
-                            <option value="3">⭐⭐⭐ Slight Buzz</option>
-                            <option value="2">⭐⭐ Sloppy</option>
-                        </select>
+                        <span class="text-zinc-400">Time: </span>
+                        <span id="statTotalTime" class="font-bold text-emerald-400">0m</span>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div>
-                    <label class="text-xs font-bold text-zinc-400">Session Notes / Observations</label>
-                    <textarea id="logNotes" rows="3" placeholder="Focus on light thumb pressure and relaxed wrist picking..." class="w-full mt-1 bg-zinc-950 text-zinc-200 text-xs p-3 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500"></textarea>
-                </div>
-
-                <button id="btnSavePracticeSession" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs py-3 rounded-xl transition-all shadow-md shadow-amber-500/10">
-                    Commit Practice Entry
+        <!-- Action Buttons (For Active Day) -->
+        <div id="sessionActionToolbar" class="mt-4 pt-4 border-t border-zinc-800/60 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-2">
+                <button id="btnAddTopicManual" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition-all flex items-center space-x-1.5">
+                    <span>➕ Add Topic</span>
+                </button>
+                <button id="btnGenerateRoutine" class="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold border border-amber-500/30 transition-all flex items-center space-x-1.5">
+                    <span>🎲 Auto-Generate Routine</span>
                 </button>
             </div>
+            <button id="btnClearRoutine" class="text-xs text-zinc-500 hover:text-rose-400 transition-colors">Clear All Items</button>
+        </div>
+    </div>
+
+    <!-- Practice Session Deck (Card Grid) -->
+    <div id="practiceCardDeck" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Practice cards rendered here dynamically -->
+    </div>
+</div>
+
+<!-- MODAL 1: Add Topic Selection Modal -->
+<div id="addTopicModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <h3 class="text-sm font-bold text-white">Select Topic from Catalog</h3>
+            <button id="btnCloseTopicModal" class="text-zinc-400 hover:text-white font-bold">✕</button>
+        </div>
+        <div id="topicSelectionList" class="space-y-2 overflow-y-auto flex-1 pr-1">
+            <!-- Dynamic Topics -->
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: Active Practice Focus Modal -->
+<div id="focusPracticeModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-4xl p-6 space-y-6 max-h-[92vh] overflow-y-auto text-zinc-200">
+        <!-- Header -->
+        <div class="flex items-start justify-between border-b border-zinc-800/80 pb-4">
+            <div>
+                <span id="focusTag" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Daily Routine</span>
+                <h2 id="focusTitle" class="text-xl font-bold text-white mt-1">Topic Title</h2>
+                <p id="focusCategory" class="text-xs text-zinc-400">Category • Subcategory</p>
+            </div>
+            <button id="btnCloseFocusModal" class="text-zinc-400 hover:text-white font-bold text-xl">✕</button>
+        </div>
+
+        <!-- Interactive Settings Bar (Key, Mode, Time Sig editable for today) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-950 p-3 rounded-2xl border border-zinc-800/80 text-xs">
+            <div>
+                <label class="block text-zinc-500 text-[10px] uppercase font-bold mb-1">Key</label>
+                <select id="focusKeySelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-white"></select>
+            </div>
+            <div>
+                <label class="block text-zinc-500 text-[10px] uppercase font-bold mb-1">Mode</label>
+                <select id="focusModeSelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-white"></select>
+            </div>
+            <div>
+                <label class="block text-zinc-500 text-[10px] uppercase font-bold mb-1">Time Sig</label>
+                <select id="focusTimeSigSelect" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-white"></select>
+            </div>
+            <div>
+                <label class="block text-zinc-500 text-[10px] uppercase font-bold mb-1">Target Minutes</label>
+                <input type="number" id="focusTargetMins" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-white" placeholder="15">
+            </div>
+        </div>
+
+        <!-- Center Stage: Metronome & Stopwatch Timer -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-950/80 border border-amber-500/20 p-4 rounded-2xl">
+            <!-- Left: Integrated Metronome -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">⏱️ Integrated Metronome</span>
+                    <div id="metroBeatIndicator" class="h-3 w-3 rounded-full bg-zinc-700 transition-all"></div>
+                </div>
+                <div class="flex items-center justify-between space-x-3">
+                    <input type="range" id="metroBpmSlider" min="40" max="260" value="120" class="w-full accent-amber-500">
+                    <span id="metroBpmDisplay" class="text-lg font-extrabold text-white min-w-[60px] text-right">120 BPM</span>
+                </div>
+                <button id="btnToggleMetronome" class="w-full py-2 rounded-xl bg-amber-500 text-zinc-950 font-bold text-xs hover:bg-amber-400 transition-colors">
+                    ▶ Start Metronome
+                </button>
+            </div>
+
+            <!-- Right: Practice Timer -->
+            <div class="space-y-3 flex flex-col justify-between border-t md:border-t-0 md:border-l border-zinc-800/80 pt-3 md:pt-0 md:pl-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-400">⏳ Practice Stopwatch</span>
+                    <span id="focusTimerDisplay" class="text-2xl font-mono font-extrabold text-white">00:00</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="btnStartTimer" class="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold text-xs hover:bg-emerald-500/30">Start</button>
+                    <button id="btnPauseTimer" class="flex-1 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold text-xs hover:bg-zinc-700">Pause</button>
+                    <button id="btnResetTimer" class="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 font-semibold text-xs hover:bg-zinc-700">Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Logging & Notes -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-zinc-400 font-semibold mb-1">Target BPM</label>
+                    <input type="number" id="focusTargetBpm" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-zinc-400 font-semibold mb-1">Achieved Max BPM</label>
+                    <input type="number" id="focusAchievedBpm" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white" placeholder="e.g. 128">
+                </div>
+                <div>
+                    <label class="block text-zinc-400 font-semibold mb-1">Duration Spent (Minutes)</label>
+                    <input type="number" id="focusDurationMins" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white" placeholder="Automatically calculated by timer">
+                </div>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-zinc-400 font-semibold mb-1">Session Practice Notes</label>
+                    <textarea id="focusSessionNotes" rows="5" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500" placeholder="How did this topic feel? Clean tone? Finger tension?"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resource Link & Attachments -->
+        <div id="focusResourcesContainer" class="border-t border-zinc-800/80 pt-4 space-y-2 text-xs">
+            <!-- Dynamically populated resource links & attachments -->
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="flex items-center justify-end space-x-3 border-t border-zinc-800/80 pt-4">
+            <button id="btnSaveCardPartial" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold">Save Progress</button>
+            <button id="btnCompleteCard" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-lg shadow-emerald-500/20">✅ Complete Topic</button>
         </div>
     </div>
 </div>
