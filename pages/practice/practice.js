@@ -561,32 +561,38 @@ let currentActiveFeatureInstance = null;
 
 async function loadInstrumentFeatures(instrument, topicTag) {
     const container = document.getElementById('dynamicFeatureContainer');
-    if (!container) return; // Safeguard if slot doesn't exist in HTML
+    if (!container) return;
     
-    // 1. Clean up any previously loaded feature module
+    // Clean up previous module instance
     if (currentActiveFeatureInstance && typeof currentActiveFeatureInstance.destroy === 'function') {
         currentActiveFeatureInstance.destroy();
         currentActiveFeatureInstance = null;
     }
 
-    // 2. Import modules directly from the root `/features/` folder
+    container.innerHTML = ''; 
+
+    // Normalize string: lowercase and trim whitespace
+    const normInst = (instrument || '').trim().toLowerCase();
+    const normTag = (topicTag || '').trim().toLowerCase();
+
     try {
-        if (instrument === 'Vocals') {
+        // Broadened vocal match to catch "Vocals", "Vocal", "Voice", "Singing", etc.
+        if (['vocals', 'vocal', 'voice', 'singing'].includes(normInst)) {
             const { PitchPipeFeature } = await import('../../features/pitchPipe.js');
             currentActiveFeatureInstance = new PitchPipeFeature(container);
             currentActiveFeatureInstance.render();
 
-        } else if (['Electric Guitar', 'Acoustic Guitar', 'Bass Guitar'].includes(instrument)) {
+        } else if (['electric guitar', 'acoustic guitar', 'bass guitar', 'guitar', 'bass'].includes(normInst)) {
             const { GuitarTunerFeature } = await import('../../features/guitarTuner.js');
             currentActiveFeatureInstance = new GuitarTunerFeature(container);
             currentActiveFeatureInstance.render();
 
-        } else if (topicTag === 'Scale Pitch Analysis') {
+        } else if (normTag === 'scale pitch analysis') {
             const { PitchGraphFeature } = await import('../../features/pitchGraph.js');
             currentActiveFeatureInstance = new PitchGraphFeature(container);
             currentActiveFeatureInstance.render();
         }
     } catch (err) {
-        console.error("Failed to load root feature module:", err);
+        console.error("Failed to load feature module:", err);
     }
 }
