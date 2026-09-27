@@ -5,38 +5,50 @@ export class PitchGraphFeature {
         this.analyser = null;
         this.micStream = null;
         this.animFrameId = null;
-        this.pitchHistory = []; // Stores recent pitch data points for scrolling graph
-        this.maxHistoryLength = 150;
+        
+        // Expanded history length for wider X-axis (~8-10 seconds of singing phrase history)
+        this.pitchHistory = []; 
+        this.maxHistoryLength = 350;
+
+        // Dynamic Pitch Range (Y-Axis)
+        this.targetMinFreq = 130; // ~C3
+        this.targetMaxFreq = 523; // ~C5
+        this.currentMinFreq = 130;
+        this.currentMaxFreq = 523;
+
         this.isListening = false;
+        this.noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     }
 
     render() {
         this.container.innerHTML = `
-            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+            <div class="bg-zinc-950 border border-amber-500/30 rounded-2xl p-4 space-y-3">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider">🎙️ Real-Time Pitch Detector & Graph</h4>
-                        <p class="text-[11px] text-zinc-400">Sing into your mic to track your pitch live</p>
+                        <h4 class="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                            📊 Dynamic Pitch Phrase Tracker
+                        </h4>
+                        <p class="text-[11px] text-zinc-400">Live scrolling graph with pitch note guides</p>
                     </div>
-                    <button id="btnTogglePitchGraph" class="px-3 py-1.5 bg-amber-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition-colors">
-                        Start Microphone
+                    <button id="btnTogglePitchGraph" class="px-3.5 py-1.5 bg-amber-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition-all">
+                        Start Mic
                     </button>
                 </div>
 
-                <!-- Display Info -->
-                <div class="flex items-center justify-between bg-zinc-950 border border-zinc-800/80 rounded-xl px-4 py-2">
+                <!-- Live Note Readout -->
+                <div class="flex items-center justify-between bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-2">
                     <div>
-                        <span class="text-[10px] text-zinc-500 block uppercase">Detected Note</span>
+                        <span class="text-[10px] text-zinc-500 block uppercase font-medium">Current Pitch</span>
                         <span id="detectedNoteDisplay" class="text-xl font-extrabold text-amber-400">--</span>
                     </div>
                     <div class="text-right">
-                        <span class="text-[10px] text-zinc-500 block uppercase">Frequency</span>
+                        <span class="text-[10px] text-zinc-500 block uppercase font-medium">Frequency</span>
                         <span id="detectedFreqDisplay" class="text-sm font-mono text-zinc-300">0 Hz</span>
                     </div>
                 </div>
 
-                <!-- Live Rolling Canvas Graph -->
-                <div class="relative w-full h-36 bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+                <!-- Wide Canvas Container -->
+                <div class="relative w-full h-48 bg-zinc-900/90 rounded-xl border border-zinc-800/80 overflow-hidden">
                     <canvas id="pitchCanvas" class="w-full h-full block"></canvas>
                 </div>
             </div>
@@ -49,9 +61,8 @@ export class PitchGraphFeature {
     initCanvas() {
         const canvas = document.getElementById('pitchCanvas');
         if (!canvas) return;
-        // Handle high DPI displays
-        canvas.width = canvas.clientWidth * window.devicePixelRatio || 600;
-        canvas.height = canvas.clientHeight * window.devicePixelRatio || 150;
+        canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+        canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
         this.drawEmptyCanvas();
     }
 
@@ -76,14 +87,14 @@ export class PitchGraphFeature {
             this.isListening = true;
             const btn = document.getElementById('btnTogglePitchGraph');
             if (btn) {
-                btn.innerText = "Stop Microphone";
-                btn.className = "px-3 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl hover:bg-rose-500/30 transition-colors";
+                btn.innerText = "Stop Mic";
+                btn.className = "px-3.5 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl hover:bg-rose-500/30 transition-all";
             }
 
             this.processAudio();
         } catch (err) {
             console.error("Microphone access error:", err);
-            alert("Could not access microphone. Please allow microphone permissions.");
+            alert("Unable to access microphone. Please check permissions.");
         }
     }
 
@@ -99,12 +110,15 @@ export class PitchGraphFeature {
 
         const btn = document.getElementById('btnTogglePitchGraph');
         if (btn) {
-            btn.innerText = "Start Microphone";
-            btn.className = "px-3 py-1.5 bg-amber-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition-colors";
+            btn.innerText = "Start Mic";
+            btn.className = "px-3.5 py-1.5 bg-amber-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition-all";
         }
 
-        document.getElementById('detectedNoteDisplay').innerText = "--";
-        document.getElementById('detectedFreqDisplay').innerText = "0 Hz";
+        const noteEl = document.getElementById('detectedNoteDisplay');
+        const freqEl = document.getElementById('detectedFreqDisplay');
+        if (noteEl) noteEl.innerText = "--";
+        if (freqEl) freqEl.innerText = "0 Hz";
+
         this.drawEmptyCanvas();
     }
 
@@ -116,24 +130,45 @@ export class PitchGraphFeature {
 
         const pitchHz = this.autoCorrelate(buffer, this.audioCtx.sampleRate);
 
-        if (pitchHz !== -1 && pitchHz > 50 && pitchHz < 1200) { // Singing range: ~50Hz - 1200Hz
+        if (pitchHz !== -1 && pitchHz >= 60 && pitchHz <= 1100) { // Vocal range (C2 to C6)
             const noteData = this.freqToNote(pitchHz);
-            document.getElementById('detectedNoteDisplay').innerText = noteData.note;
-            document.getElementById('detectedFreqDisplay').innerText = `${Math.round(pitchHz)} Hz`;
+            
+            const noteEl = document.getElementById('detectedNoteDisplay');
+            const freqEl = document.getElementById('detectedFreqDisplay');
+            if (noteEl) noteEl.innerText = noteData.note;
+            if (freqEl) freqEl.innerText = `${Math.round(pitchHz)} Hz`;
+
             this.pitchHistory.push(pitchHz);
+            this.updateDynamicYBounds(pitchHz);
         } else {
-            this.pitchHistory.push(null); // Silent / Unvoiced frame
+            this.pitchHistory.push(null);
         }
 
         if (this.pitchHistory.length > this.maxHistoryLength) {
             this.pitchHistory.shift();
         }
 
+        // Smooth transition for dynamic Y-axis bounds
+        this.currentMinFreq += (this.targetMinFreq - this.currentMinFreq) * 0.1;
+        this.currentMaxFreq += (this.targetMaxFreq - this.currentMaxFreq) * 0.1;
+
         this.drawGraph();
         this.animFrameId = requestAnimationFrame(() => this.processAudio());
     }
 
-    // Autocorrelation algorithm to find fundamental frequency (pitch)
+    // Adjust Y-axis scale smoothly based on singing register
+    updateDynamicYBounds(latestPitch) {
+        const validPitches = this.pitchHistory.filter(p => p !== null);
+        if (validPitches.length < 5) return;
+
+        const minRecorded = Math.min(...validPitches);
+        const maxRecorded = Math.max(...validPitches);
+
+        // Add 15% breathing room above and below
+        this.targetMinFreq = Math.max(50, minRecorded * 0.85);
+        this.targetMaxFreq = Math.min(1200, maxRecorded * 1.15);
+    }
+
     autoCorrelate(buffer, sampleRate) {
         let SIZE = buffer.length;
         let rms = 0;
@@ -144,7 +179,7 @@ export class PitchGraphFeature {
         }
         rms = Math.sqrt(rms / SIZE);
 
-        if (rms < 0.01) return -1; // Volume too low
+        if (rms < 0.015) return -1; // Ignore background ambient noise
 
         let r1 = 0, r2 = SIZE - 1, thres = 0.2;
         for (let i = 0; i < SIZE / 2; i++) {
@@ -183,11 +218,14 @@ export class PitchGraphFeature {
     }
 
     freqToNote(freq) {
-        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const midiNum = Math.round(12 * (Math.log(freq / 440) / Math.log(2))) + 69;
         const noteIndex = (midiNum % 12 + 12) % 12;
         const octave = Math.floor(midiNum / 12) - 1;
-        return { note: `${noteNames[noteIndex]}${octave}`, midi: midiNum };
+        return { note: `${this.noteNames[noteIndex]}${octave}`, midi: midiNum };
+    }
+
+    midiToFreq(midi) {
+        return 440 * Math.pow(2, (midi - 69) / 12);
     }
 
     drawEmptyCanvas() {
@@ -196,10 +234,10 @@ export class PitchGraphFeature {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        ctx.fillStyle = "#52525b";
+        ctx.fillStyle = "#71717a";
         ctx.font = "12px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Click 'Start Microphone' to begin pitch tracking", canvas.width / 2, canvas.height / 2);
+        ctx.fillText("Click 'Start Mic' to track singing phrases", canvas.width / 2, canvas.height / 2);
     }
 
     drawGraph() {
@@ -211,37 +249,63 @@ export class PitchGraphFeature {
 
         ctx.clearRect(0, 0, w, h);
 
-        // Grid lines (Min 80Hz ~ C2, Max 800Hz ~ G5)
-        const minFreq = 80;
-        const maxFreq = 800;
+        const minF = this.currentMinFreq;
+        const maxF = this.currentMaxFreq;
 
-        ctx.strokeStyle = '#27272a';
+        // --- DRAW Y-AXIS GRID LINES WITH NOTE NAMES ---
+        const minMidi = Math.ceil(12 * (Math.log(minF / 440) / Math.log(2)) + 69);
+        const maxMidi = Math.floor(12 * (Math.log(maxF / 440) / Math.log(2)) + 69);
+
         ctx.lineWidth = 1;
-        for (let f = 100; f <= 700; f += 100) {
-            const y = h - ((f - minFreq) / (maxFreq - minFreq)) * h;
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
+        ctx.font = `${10 * (window.devicePixelRatio || 1)}px monospace`;
+        ctx.textAlign = "left";
+
+        for (let m = minMidi; m <= maxMidi; m++) {
+            const freq = this.midiToFreq(m);
+            const noteName = `${this.noteNames[(m % 12 + 12) % 12]}${Math.floor(m / 12) - 1}`;
+            const isNatural = !noteName.includes('#');
+
+            // Logarithmic mapping for musical pitch
+            const y = h - ((Math.log2(freq) - Math.log2(minF)) / (Math.log2(maxF) - Math.log2(minF))) * h;
+
+            if (y >= 10 && y <= h - 10) {
+                ctx.strokeStyle = isNatural ? '#3f3f46' : '#27272a';
+                ctx.beginPath();
+                ctx.moveTo(35 * (window.devicePixelRatio || 1), y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+
+                ctx.fillStyle = isNatural ? '#fbbf24' : '#71717a';
+                ctx.fillText(noteName, 5 * (window.devicePixelRatio || 1), y + 3 * (window.devicePixelRatio || 1));
+            }
         }
 
-        // Pitch Line
+        // Y-axis separator
+        ctx.strokeStyle = '#3f3f46';
         ctx.beginPath();
-        ctx.strokeStyle = '#f59e0b'; // Amber-500
-        ctx.lineWidth = 3 * (window.devicePixelRatio || 1);
+        ctx.moveTo(32 * (window.devicePixelRatio || 1), 0);
+        ctx.lineTo(32 * (window.devicePixelRatio || 1), h);
+        ctx.stroke();
+
+        // --- DRAW PITCH TRAIL ---
+        ctx.beginPath();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2.5 * (window.devicePixelRatio || 1);
         ctx.lineJoin = 'round';
 
+        const paddingLeft = 35 * (window.devicePixelRatio || 1);
+        const graphWidth = w - paddingLeft;
+        const stepX = graphWidth / (this.maxHistoryLength - 1);
+
         let isDrawing = false;
-        const stepX = w / (this.maxHistoryLength - 1);
 
         for (let i = 0; i < this.pitchHistory.length; i++) {
             const pitch = this.pitchHistory[i];
-            const x = i * stepX;
+            const x = paddingLeft + (i * stepX);
 
             if (pitch !== null) {
-                // Map pitch on log scale for equal musical interval representation
-                const clampedPitch = Math.min(Math.max(pitch, minFreq), maxFreq);
-                const y = h - ((clampedPitch - minFreq) / (maxFreq - minFreq)) * h;
+                const clampedPitch = Math.min(Math.max(pitch, minF), maxF);
+                const y = h - ((Math.log2(clampedPitch) - Math.log2(minF)) / (Math.log2(maxF) - Math.log2(minF))) * h;
 
                 if (!isDrawing) {
                     ctx.moveTo(x, y);
@@ -258,5 +322,6 @@ export class PitchGraphFeature {
 
     destroy() {
         this.stop();
+        this.container.innerHTML = '';
     }
 }
