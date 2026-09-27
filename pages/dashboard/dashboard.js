@@ -14,15 +14,16 @@ export async function initPage() {
     applyPresetRange('this_month');
 }
 
+// 1. Fetch real session logs from the personal user DB path
 async function fetchUserLogs() {
     const user = gatewayAuth.currentUser;
     if (!user) return;
 
     try {
-        const logsRef = collection(gatewayDb, "practice_logs");
+        // Query the user's personal practice_logs subcollection
+        const logsRef = collection(gatewayDb, "users", user.uid, "practice_logs");
         const q = query(
             logsRef, 
-            where("userId", "==", user.uid),
             orderBy("date", "desc")
         );
 
