@@ -1,21 +1,32 @@
-import { gatewayAuth, gatewayDb, loadViewRouter } from '../../main.js';
-import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, query, getDoc, doc, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { gatewayAuth, gatewayDb } from '../../main.js';
+import { 
+    collectionGroup, 
+    getDocs, 
+    doc, 
+    getDoc, 
+    getFirestore, 
+    initializeApp, 
+    getApps 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-let userPracticeLogs = [];
-let activeCalendarDate = new Date();
-let selectedPreset = 'this_month';
+let activeUser = null;
+let personalDb = null;
+let allSessionItems = [];
 
-export async function initPage() {
-    setupRedirectListener();
-    setupPeriodButtons();
-    setupCalendarView();
-    
-    await fetchUserLogs();
-    applyPresetRange('this_month');
+/**
+ * 1. Adjust date string to local 4-hour shifted practice window YYYY-MM-DD
+ */
+function getLogicalDateString(dateObj = new Date()) {
+    const adjustedDate = new Date(dateObj.getTime() - (4 * 60 * 60 * 1000));
+    const year = adjustedDate.getFullYear();
+    const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(adjustedDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
-// Helper to retrieve user's personal Firestore instance
+/**
+ * 2. Resolve personal Firestore instance if customized keys exist
+ */
 async function getPersonalDatabaseInstance(user) {
     try {
         const snapshot = await getDoc(doc(gatewayDb, "user_configs", user.uid));
@@ -29,362 +40,209 @@ async function getPersonalDatabaseInstance(user) {
             return getFirestore(personalApp);
         }
     } catch (e) {
-        console.error("Personal DB Error:", e);
+        console.error("Personal DB Error on Dashboard:", e);
     }
     return gatewayDb;
 }
 
-async function fetchUserLogs() {
-    const user = gatewayAuth.currentUser;
-    if (!user) return;
+/**
+ * 3. Primary Page Initialization
+ */
+export async function initDashboardPage() {
+    activeUser = gatewayAuth.currentUser;
+    if (!activeUser) return;
+
+    personalDb = await getPersonalDatabaseInstance(activeUser);
+
+    setupDashboardEventListeners();
+    await fetchAllDashboardData();
+}
+
+/**
+ * 4. Setup Event Listeners (Filter Range Selector)
+ */
+function setupDashboardEventListeners() {
+    const rangeSelect = document.getElementById('dashRangeFilter');
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', () => {
+            calculateAndRenderStats(rangeSelect.value);
+        });
+    }
+}
+
+/**
+ * 5. Fetch ALL practice items subcollections across all dates & instruments
+ */
+async function fetchAllDashboardData() {
+    const dbToUse = personalDb || gatewayDb;
 
     try {
-        const db = await getPersonalDatabaseInstance(user);
-        const logsRef = collection(db, "practice_logs");
-        const q = query(
-            logsRef, 
-            orderBy("date", "desc")
-        );
+        // Query every "items" subcollection in the database instance
+        const querySnapshot = await getDocs(collectionGroup(dbToUse, 'items'));
+        
+        // Filter out items belonging to the active user's document path
+        allSessionItems = querySnapshot.docs
+            .filter(d => d.ref.path.includes(`users/${activeUser.uid}/practice_sessions/`))
+            .map(d => {
+                const data = d.data();
+                
+                // Extract session metadata from path: .../practice_sessions/{DATE}_{INSTRUMENT}/items/{ID}
+                const pathParts = d.ref.path.split('/');
+                const sessionFolder = pathParts[pathParts.indexOf('practice_sessions') + 1] || '';
+                const [datePart, ...instParts] = sessionFolder.split('_');
+                const rawInstrument = instParts.join('_');
 
-        const querySnapshot = await getDocs(q);
-        userPracticeLogs = [];
-
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            userPracticeLogs.push({
-                id: doc.id,
-                date: data.date,
-                category: data.category || 'General',
-                topic: data.topic || 'Untitled Session',
-                key: data.key || null,
-                mode: data.mode || null,
-                minutes: Number(data.minutes) || 0,
-                bpm: data.bpm || null
+                return {
+                    id: d.id,
+                    ...data,
+                    sessionDate: datePart || getLogicalDateString(),
+                    instrument: rawInstrument ? decodeURIComponent(rawInstrument) : 'Unknown'
+                };
             });
-        });
+
+        // Default to "all" time or "30" days on initial render
+        const rangeSelect = document.getElementById('dashRangeFilter');
+        const defaultRange = rangeSelect ? rangeSelect.value : 'all';
+        
+        calculateAndRenderStats(defaultRange);
+
     } catch (err) {
-        console.error("Error loading practice logs from personal DB:", err);
+        console.error("Error fetching all dashboard stats:", err);
     }
 }
 
-function setupRedirectListener() {
-    const btnStart = document.getElementById('btnStartTodaySession');
-    if (btnStart) {
-        btnStart.addEventListener('click', () => {
-            loadViewRouter('practice');
-        });
-    }
-}
+/**
+ * 6. Calculate Metrics based on Selected Filter Range
+ */
+function calculateAndRenderStats(rangeMode = 'all') {
+    const todayStr = getLogicalDateString();
+    const today = new Date(todayStr);
 
-function setupPeriodButtons() {
-    const buttons = document.querySelectorAll('.period-btn');
-    const startPicker = document.getElementById('startDatePicker');
-    const endPicker = document.getElementById('endDatePicker');
+    // Filter items based on selected date range
+    const filteredItems = allSessionItems.filter(item => {
+        if (rangeMode === 'all') return true;
 
-    buttons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            buttons.forEach(b => {
-                b.classList.remove('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
-                b.classList.add('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
-            });
+        const itemDate = new Date(item.sessionDate);
+        const diffInDays = Math.floor((today - itemDate) / (1000 * 60 * 60 * 24));
 
-            const target = e.currentTarget;
-            target.classList.add('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
-            target.classList.remove('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
+        if (rangeMode === 'today') return item.sessionDate === todayStr;
+        if (rangeMode === '7') return diffInDays >= 0 && diffInDays < 7;
+        if (rangeMode === '30') return diffInDays >= 0 && diffInDays < 30;
 
-            selectedPreset = target.getAttribute('data-period');
-            applyPresetRange(selectedPreset);
-        });
+        return true;
     });
 
-    startPicker?.addEventListener('change', () => {
-        clearButtonHighlights();
-        renderDashboard();
-    });
-    endPicker?.addEventListener('change', () => {
-        clearButtonHighlights();
-        renderDashboard();
-    });
+    // Metric 1: Total Practice Minutes
+    const totalMinutes = filteredItems.reduce((sum, item) => sum + (Number(item.durationMins) || 0), 0);
+
+    // Metric 2: Completed Items
+    const completedCount = filteredItems.filter(item => Boolean(item.completed)).length;
+    const totalCount = filteredItems.length;
+
+    // Metric 3: Active Unique Practice Days
+    const uniqueDays = new Set(filteredItems.map(item => item.sessionDate)).size;
+
+    // Metric 4: Daily Average Practice Time
+    const dailyAverageMins = uniqueDays > 0 ? Math.round(totalMinutes / uniqueDays) : 0;
+
+    // Metric 5: Streak Calculation (Consecutive days worked backwards from today)
+    const currentStreak = calculateStreak(allSessionItems);
+
+    // 7. Push calculated values into HTML elements
+    updateUIElement('dashStatTotalTime', formatMinutesDisplay(totalMinutes));
+    updateUIElement('dashStatCompleted', `${completedCount}/${totalCount}`);
+    updateUIElement('dashStatDailyAvg', `${dailyAverageMins}m/day`);
+    updateUIElement('dashStatStreak', `${currentStreak} Days`);
+
+    // Render Recent Sessions Preview Table/List
+    renderRecentActivityTable(filteredItems);
 }
 
-function clearButtonHighlights() {
-    document.querySelectorAll('.period-btn').forEach(b => {
-        b.classList.remove('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
-        b.classList.add('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
-    });
-}
+/**
+ * Calculate Consecutive Practice Days Streak
+ */
+function calculateStreak(items) {
+    if (!items || items.length === 0) return 0;
 
-function applyPresetRange(preset) {
-    const now = new Date();
-    let start = new Date();
-    let end = new Date();
+    // Extract sorted unique practice dates (newest to oldest)
+    const activeDates = Array.from(new Set(items.map(i => i.sessionDate))).sort().reverse();
+    if (activeDates.length === 0) return 0;
 
-    if (preset === 'this_week') {
-        const day = now.getDay();
-        start.setDate(now.getDate() - day);
-    } else if (preset === 'last_week') {
-        const day = now.getDay();
-        start.setDate(now.getDate() - day - 7);
-        end.setDate(now.getDate() - day - 1);
-    } else if (preset === 'this_month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (preset === 'last_month') {
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
-    } else if (preset === 'ytd') {
-        start = new Date(now.getFullYear(), 0, 1);
-    } else if (preset === 'last_year') {
-        start = new Date(now.getFullYear() - 1, 0, 1);
-        end = new Date(now.getFullYear() - 1, 11, 31);
-    }
-
-    const startPicker = document.getElementById('startDatePicker');
-    const endPicker = document.getElementById('endDatePicker');
-
-    if (startPicker) startPicker.value = formatDateForInput(start);
-    if (endPicker) endPicker.value = formatDateForInput(end);
-
-    renderDashboard();
-}
-
-function formatDateForInput(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
-function renderDashboard() {
-    const sVal = document.getElementById('startDatePicker')?.value;
-    const eVal = document.getElementById('endDatePicker')?.value;
-
-    const start = sVal ? new Date(sVal + 'T00:00:00') : new Date(0);
-    const end = eVal ? new Date(eVal + 'T23:59:59') : new Date();
-
-    // 1. Current Period
-    const filteredLogs = userPracticeLogs.filter(log => {
-        const logDate = new Date(log.date + 'T00:00:00');
-        return logDate >= start && logDate <= end;
-    });
-
-    // 2. Prior Period Comparison
-    const periodDurationMs = end.getTime() - start.getTime();
-    const priorStart = new Date(start.getTime() - periodDurationMs);
-    const priorEnd = new Date(start.getTime() - 1);
-
-    const priorLogs = userPracticeLogs.filter(log => {
-        const logDate = new Date(log.date + 'T00:00:00');
-        return logDate >= priorStart && logDate <= priorEnd;
-    });
-
-    // 3. Render Cards & Grid
-    renderTimeMetric(filteredLogs, priorLogs);
-    calculateStreak(filteredLogs);
-    renderCategoryCards(filteredLogs);
-    renderCalendarGrid();
-}
-
-function renderTimeMetric(currentLogs, priorLogs) {
-    const currentMins = currentLogs.reduce((acc, curr) => acc + curr.minutes, 0);
-    const priorMins = priorLogs.reduce((acc, curr) => acc + curr.minutes, 0);
-
-    const hoursEl = document.getElementById('statTotalHours');
-    if (hoursEl) hoursEl.innerText = (currentMins / 60).toFixed(1);
-
-    const timeChangeEl = document.getElementById('statTimeChange');
-    if (!timeChangeEl) return;
-
-    if (priorMins === 0) {
-        if (currentMins > 0) {
-            timeChangeEl.innerHTML = `<span class="text-emerald-400 font-bold">▲ +100%</span> vs prior period`;
-        } else {
-            timeChangeEl.innerText = `0 hrs logged in prior period`;
-        }
-    } else {
-        const diffPercent = (((currentMins - priorMins) / priorMins) * 100).toFixed(1);
-        if (diffPercent > 0) {
-            timeChangeEl.innerHTML = `<span class="text-emerald-400 font-bold">▲ +${diffPercent}%</span> vs prior period`;
-        } else if (diffPercent < 0) {
-            timeChangeEl.innerHTML = `<span class="text-rose-400 font-bold">▼ ${diffPercent}%</span> vs prior period`;
-        } else {
-            timeChangeEl.innerHTML = `<span class="text-zinc-400 font-bold">0% change</span> vs prior period`;
-        }
-    }
-}
-
-function calculateStreak(filteredLogs) {
-    const streakSubtextEl = document.querySelector('#statActiveStreak')?.parentElement?.nextElementSibling;
-    
-    if (userPracticeLogs.length === 0) {
-        const streakEl = document.getElementById('statActiveStreak');
-        if (streakEl) streakEl.innerText = '0';
-        if (streakSubtextEl) streakSubtextEl.innerText = 'No practice logs recorded yet';
-        return;
-    }
-
-    const uniqueDates = [...new Set(userPracticeLogs.map(l => l.date))].sort().reverse();
+    const todayStr = getLogicalDateString();
     let streak = 0;
-    let checkDate = new Date();
-    checkDate.setHours(0, 0, 0, 0);
+    let checkDate = new Date(todayStr);
 
-    for (let i = 0; i < uniqueDates.length; i++) {
-        const pDate = new Date(uniqueDates[i] + 'T00:00:00');
-        const diffDays = Math.floor((checkDate - pDate) / (1000 * 60 * 60 * 24));
+    // Check if user practiced today or yesterday to maintain active streak
+    const hasPracticedToday = activeDates.includes(todayStr);
+    
+    // Shift checkDate back 1 day if user hasn't logged today yet
+    if (!hasPracticedToday) {
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
 
-        if (diffDays === 0 || diffDays === 1) {
+    while (true) {
+        const year = checkDate.getFullYear();
+        const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+        const day = String(checkDate.getDate()).padStart(2, '0');
+        const formattedCheck = `${year}-${month}-${day}`;
+
+        if (activeDates.includes(formattedCheck)) {
             streak++;
-            checkDate = pDate;
+            checkDate.setDate(checkDate.getDate() - 1);
         } else {
             break;
         }
     }
 
-    const streakEl = document.getElementById('statActiveStreak');
-    if (streakEl) streakEl.innerText = streak;
-
-    const rangeActiveDays = new Set(filteredLogs.map(l => l.date)).size;
-    if (streakSubtextEl) {
-        streakSubtextEl.innerText = `Practiced on ${rangeActiveDays} distinct day${rangeActiveDays === 1 ? '' : 's'} in this range`;
-    }
+    return streak;
 }
 
-function renderCategoryCards(logs) {
-    const container = document.getElementById('categoryCardsContainer');
+/**
+ * Format minutes into readable "Xh Ym" or "Ym"
+ */
+function formatMinutesDisplay(mins) {
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return `${hours}h ${remainingMins}m`;
+}
+
+/**
+ * Helper to update DOM element securely
+ */
+function updateUIElement(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+}
+
+/**
+ * Render recent items preview in Dashboard UI
+ */
+function renderRecentActivityTable(items) {
+    const container = document.getElementById('dashRecentActivityList');
     if (!container) return;
 
-    const categories = {};
-    logs.forEach(log => {
-        if (!categories[log.category]) {
-            categories[log.category] = { totalPractices: 0, topics: {} };
-        }
-        categories[log.category].totalPractices += 1;
-
-        const topicKey = `${log.topic}|${log.key || ''}|${log.mode || ''}`;
-        categories[log.category].topics[topicKey] = (categories[log.category].topics[topicKey] || 0) + 1;
-    });
-
-    if (Object.keys(categories).length === 0) {
-        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No practice sessions logged in this period.</div>`;
+    if (items.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 py-4 text-center">No practice sessions found for this filter range.</p>`;
         return;
     }
 
-    container.innerHTML = Object.entries(categories).map(([catName, catData]) => {
-        const topicsListMarkup = Object.entries(catData.topics).map(([keyStr, count]) => {
-            const [topic, key, mode] = keyStr.split('|');
-            const keyModeStr = (key || mode) ? `(${[key, mode].filter(Boolean).join(' ')})` : '';
-            return `
-                <li class="flex items-center justify-between text-xs py-1 border-b border-zinc-800/50 last:border-0">
-                    <span class="text-zinc-300 font-medium">${topic} <span class="text-amber-500/80 text-[10px]">${keyModeStr}</span></span>
-                    <span class="text-amber-400 font-mono font-bold">${count}x</span>
-                </li>
-            `;
-        }).join('');
+    // Show top 10 most recent items
+    const recentItems = [...items].reverse().slice(0, 10);
 
-        return `
-            <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 space-y-3">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider">${catName}</h3>
-                    <span class="text-xs font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-lg">
-                        ${catData.totalPractices} session${catData.totalPractices > 1 ? 's' : ''}
+    container.innerHTML = recentItems.map(item => `
+        <div class="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/80 rounded-xl text-xs mb-2">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-bold text-white">${item.title}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded ${item.completed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}">
+                        ${item.completed ? 'Completed' : 'Pending'}
                     </span>
                 </div>
-
-                <details class="group">
-                    <summary class="text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer flex items-center justify-between font-semibold pt-1">
-                        <span>Topic Breakdown (${Object.keys(catData.topics).length})</span>
-                        <span class="transition-transform group-open:rotate-180">▾</span>
-                    </summary>
-                    <ul class="mt-2 pt-2 border-t border-zinc-800/80 space-y-0.5">
-                        ${topicsListMarkup}
-                    </ul>
-                </details>
-            </div>
-        `;
-    }).join('');
-}
-
-function setupCalendarView() {
-    const prevBtn = document.getElementById('btnPrevMonth');
-    const nextBtn = document.getElementById('btnNextMonth');
-
-    prevBtn?.addEventListener('click', () => {
-        activeCalendarDate.setMonth(activeCalendarDate.getMonth() - 1);
-        renderCalendarGrid();
-    });
-
-    nextBtn?.addEventListener('click', () => {
-        activeCalendarDate.setMonth(activeCalendarDate.getMonth() + 1);
-        renderCalendarGrid();
-    });
-
-    document.getElementById('btnCloseDayDetails')?.addEventListener('click', () => {
-        document.getElementById('dayDetailsPanel')?.classList.add('hidden');
-    });
-}
-
-function renderCalendarGrid() {
-    const grid = document.getElementById('calendarGrid');
-    const label = document.getElementById('calendarMonthLabel');
-    if (!grid || !label) return;
-
-    const year = activeCalendarDate.getFullYear();
-    const month = activeCalendarDate.getMonth();
-
-    label.innerText = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
-
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-
-    grid.innerHTML = '';
-
-    for (let i = 0; i < firstDayIndex; i++) {
-        grid.innerHTML += `<div class="h-10 bg-zinc-950/40 rounded-xl opacity-30"></div>`;
-    }
-
-    for (let day = 1; day <= totalDaysInMonth; day++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayLogs = userPracticeLogs.filter(l => l.date === dateStr);
-        const totalMins = dayLogs.reduce((acc, curr) => acc + curr.minutes, 0);
-
-        let bgClass = "bg-zinc-800/80 text-zinc-400";
-        if (totalMins > 0 && totalMins <= 20) bgClass = "bg-amber-950/80 text-amber-300 border border-amber-900/50";
-        else if (totalMins > 20 && totalMins <= 45) bgClass = "bg-amber-800/80 text-amber-200 border border-amber-700/50";
-        else if (totalMins > 45 && totalMins <= 75) bgClass = "bg-amber-500 text-zinc-950 font-bold border border-amber-400";
-        else if (totalMins > 75) bgClass = "bg-yellow-400 text-zinc-950 font-black border border-yellow-300 shadow-md shadow-yellow-500/20";
-
-        const dayCell = document.createElement('div');
-        dayCell.className = `h-10 rounded-xl flex items-center justify-center text-xs font-semibold cursor-pointer hover:scale-105 transition-all ${bgClass}`;
-        dayCell.innerText = day;
-
-        dayCell.addEventListener('click', () => showDayDetails(dateStr, dayLogs));
-        grid.appendChild(dayCell);
-    }
-}
-
-function showDayDetails(dateStr, logs) {
-    const panel = document.getElementById('dayDetailsPanel');
-    const title = document.getElementById('selectedDateTitle');
-    const container = document.getElementById('dayPracticesList');
-
-    if (!panel || !title || !container) return;
-
-    title.innerText = dateStr;
-    panel.classList.remove('hidden');
-
-    if (logs.length === 0) {
-        container.innerHTML = `<p class="text-xs text-zinc-500">No practice sessions logged on this date.</p>`;
-        return;
-    }
-
-    container.innerHTML = logs.map(log => `
-        <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5">
-            <div>
-                <div class="text-xs font-bold text-amber-400">${log.topic}</div>
-                <div class="text-[10px] text-zinc-400">${log.category} ${log.key ? `• ${log.key}${log.mode || ''}` : ''}</div>
+                <p class="text-[10px] text-zinc-400 mt-0.5">${item.instrument} • ${item.sessionDate}</p>
             </div>
             <div class="text-right">
-                <div class="text-xs font-mono font-bold text-zinc-200">${log.minutes} mins</div>
-                ${log.bpm ? `<div class="text-[10px] font-mono text-amber-500">${log.bpm} BPM</div>` : ''}
+                <span class="font-semibold text-amber-400">${item.durationMins || 0} mins</span>
             </div>
         </div>
     `).join('');
