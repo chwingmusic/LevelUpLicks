@@ -1,9 +1,9 @@
+// app.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
     getAuth, 
     signInWithPopup, 
-    signInWithRedirect, 
-    getRedirectResult, 
+    signInWithCredential,
     GoogleAuthProvider, 
     signOut, 
     onAuthStateChanged 
@@ -20,7 +20,7 @@ const gatewayConfig = {
     measurementId: "G-X3GP1C802L"
 };
 
-// Open System-Wide Gateway Pipelines (Default App Instance)
+// Open System-Wide Gateway Pipelines
 export const gatewayApp = initializeApp(gatewayConfig);
 export const gatewayAuth = getAuth(gatewayApp);
 export const gatewayDb = getFirestore(gatewayApp);
@@ -64,31 +64,9 @@ export async function loadViewRouter(routeKey) {
 }
 
 // --------------------------------------------------------------------------
-// MOBILE AUTH GATEWAY & STATE OBSERVER FIX
+// AUTH STATE OBSERVER
 // --------------------------------------------------------------------------
-let isRedirectProcessing = true;
-
-// 1. Process Mobile Redirect FIRST before allowing state decisions
-getRedirectResult(gatewayAuth)
-    .then((result) => {
-        if (result?.user) {
-            console.log("Mobile redirect login successful for:", result.user.email);
-        }
-    })
-    .catch((error) => {
-        console.error("Redirect auth error:", error);
-    })
-    .finally(() => {
-        isRedirectProcessing = false;
-    });
-
-// 2. Global Auth State Observer with Mobile Redirect Guard
 onAuthStateChanged(gatewayAuth, async (activeUser) => {
-    // If mobile redirect result is still being parsed, wait briefly
-    if (isRedirectProcessing) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     const authOverlay = document.getElementById('authOverlay');
 
     if (activeUser) {
@@ -125,26 +103,59 @@ document.querySelectorAll('.nav-link').forEach(btn => {
     });
 });
 
-// Helper to check for Mobile Devices
 function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
+
+// --------------------------------------------------------------------------
+// MOBILE-SAFE GOOGLE AUTH HANDLER (GIS CLIENT + FIREBASE CREDENTIAL)
+// --------------------------------------------------------------------------
+async function triggerMobileGoogleLogin() {
+    if (typeof google === 'undefined' || !google.accounts) {
+        console.warn("Google GIS SDK not ready, falling back to popup");
+        const provider = new GoogleAuthProvider();
+        return signInWithPopup(gatewayAuth, provider);
+    }
+
+    // Initialize GIS Client
+    google.accounts.id.initialize({
+        // Extract OAuth Client ID associated with your Firebase Web App
+        client_id: "878018571238-0u5pld3i270v5i3v5103.apps.googleusercontent.com", 
+        callback: async (response) => {
+            try {
+                // Convert Google ID token directly into Firebase Auth Credential
+                const credential = GoogleAuthProvider.credential(response.credential);
+                await signInWithCredential(gatewayAuth, credential);
+            } catch (err) {
+                console.error("Credential Sign-in error:", err);
+            }
+        }
+    });
+
+    // Prompt native prompt on mobile browsers without page redirects
+    google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            // Fallback to standard popup if prompt is dismissed/blocked
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(gatewayAuth, provider);
+        }
+    });
 }
 
 // Login Button Listener
 const btnLogin = document.getElementById('btnLogin');
 if (btnLogin) {
     btnLogin.addEventListener('click', async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-
         if (isMobileDevice()) {
-            await signInWithRedirect(gatewayAuth, provider);
+            await triggerMobileGoogleLogin();
         } else {
             try {
+                const provider = new GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
                 await signInWithPopup(gatewayAuth, provider);
             } catch (error) {
-                console.warn("Popup blocked, falling back to redirect:", error);
-                await signInWithRedirect(gatewayAuth, provider);
+                console.warn("Popup blocked, trying Mobile GIS auth:", error);
+                await triggerMobileGoogleLogin();
             }
         }
     });
