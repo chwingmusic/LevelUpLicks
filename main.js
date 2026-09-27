@@ -25,11 +25,6 @@ export const gatewayApp = initializeApp(gatewayConfig);
 export const gatewayAuth = getAuth(gatewayApp);
 export const gatewayDb = getFirestore(gatewayApp);
 
-// Catch redirect authentication results (Required for mobile redirect flow)
-getRedirectResult(gatewayAuth).catch((error) => {
-    console.error("Redirect auth error:", error);
-});
-
 // View mapping router config
 const viewRoutes = {
     dashboard: { html: 'pages/dashboard/dashboard.html', js: 'pages/dashboard/dashboard.js' },
@@ -68,14 +63,43 @@ export async function loadViewRouter(routeKey) {
     }
 }
 
-// Global Auth State Observer
+// --------------------------------------------------------------------------
+// MOBILE AUTH GATEWAY & STATE OBSERVER FIX
+// --------------------------------------------------------------------------
+let isRedirectProcessing = true;
+
+// 1. Process Mobile Redirect FIRST before allowing state decisions
+getRedirectResult(gatewayAuth)
+    .then((result) => {
+        if (result?.user) {
+            console.log("Mobile redirect login successful for:", result.user.email);
+        }
+    })
+    .catch((error) => {
+        console.error("Redirect auth error:", error);
+    })
+    .finally(() => {
+        isRedirectProcessing = false;
+    });
+
+// 2. Global Auth State Observer with Mobile Redirect Guard
 onAuthStateChanged(gatewayAuth, async (activeUser) => {
+    // If mobile redirect result is still being parsed, wait briefly
+    if (isRedirectProcessing) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     const authOverlay = document.getElementById('authOverlay');
+
     if (activeUser) {
-        authOverlay.classList.add('hidden');
-        document.getElementById('profileName').innerText = activeUser.displayName || activeUser.email;
-        if (activeUser.photoURL) {
-            document.getElementById('userAvatar').innerHTML = `<img src="${activeUser.photoURL}" class="w-full h-full object-cover">`;
+        if (authOverlay) authOverlay.classList.add('hidden');
+        
+        const profileName = document.getElementById('profileName');
+        if (profileName) profileName.innerText = activeUser.displayName || activeUser.email;
+        
+        const userAvatar = document.getElementById('userAvatar');
+        if (activeUser.photoURL && userAvatar) {
+            userAvatar.innerHTML = `<img src="${activeUser.photoURL}" class="w-full h-full object-cover">`;
         }
         
         try {
@@ -90,7 +114,7 @@ onAuthStateChanged(gatewayAuth, async (activeUser) => {
             loadViewRouter('configuration');
         }
     } else {
-        authOverlay.classList.remove('hidden');
+        if (authOverlay) authOverlay.classList.remove('hidden');
     }
 });
 
@@ -106,23 +130,20 @@ function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 }
 
-// Login Button Listener with Mobile-Safe Fallback
+// Login Button Listener
 const btnLogin = document.getElementById('btnLogin');
 if (btnLogin) {
     btnLogin.addEventListener('click', async () => {
         const provider = new GoogleAuthProvider();
-        
-        // Custom parameter ensures fresh account selection without hanging state
         provider.setCustomParameters({ prompt: 'select_account' });
 
         if (isMobileDevice()) {
-            // Direct redirect on mobile prevents sessionStorage partitioning errors
             await signInWithRedirect(gatewayAuth, provider);
         } else {
             try {
                 await signInWithPopup(gatewayAuth, provider);
             } catch (error) {
-                console.warn("Popup blocked or failed, falling back to redirect:", error);
+                console.warn("Popup blocked, falling back to redirect:", error);
                 await signInWithRedirect(gatewayAuth, provider);
             }
         }
