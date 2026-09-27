@@ -117,7 +117,8 @@ function setupEventListeners() {
     document.getElementById('btnCloseFocusModal').addEventListener('click', closeFocusModal);
     document.getElementById('btnSaveCardPartial').addEventListener('click', () => saveFocusCard(false));
     document.getElementById('btnCompleteCard').addEventListener('click', () => saveFocusCard(true));
-
+    document.getElementById('btnDeleteCurrentCard').addEventListener('click', deleteCurrentFocusCard);
+    
     // Metronome BPM Sync
     const bpmSlider = document.getElementById('metroBpmSlider');
     const singleBpmInput = document.getElementById('focusSingleBpm');
@@ -365,6 +366,28 @@ function closeFocusModal() {
     stopTimer();
     stopMetronome();
     document.getElementById('focusPracticeModal').classList.add('hidden');
+}
+
+async function deleteCurrentFocusCard() {
+    if (!activeCardEditing) return;
+
+    const confirmDelete = confirm(`Are you sure you want to delete "${activeCardEditing.title}" from today's practice?`);
+    if (!confirmDelete) return;
+
+    const dbToUse = personalDb || gatewayDb;
+    const cardPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items/${activeCardEditing.id}`;
+
+    try {
+        // Delete document from Firestore
+        await deleteDoc(doc(dbToUse, cardPath));
+        
+        // Close modal and refresh daily deck
+        closeFocusModal();
+        await loadDailySession();
+    } catch (err) {
+        console.error("Error deleting practice card:", err);
+        alert("Failed to delete the card. Please try again.");
+    }
 }
 
 async function saveFocusCard(isCompleted) {
