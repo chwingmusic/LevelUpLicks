@@ -501,3 +501,39 @@ function updateTimerDisplay() {
     const secs = String(elapsedSeconds % 60).padStart(2, '0');
     document.getElementById('focusTimerDisplay').innerText = `${mins}:${secs}`;
 }
+
+let currentActiveFeatureInstance = null;
+
+async function loadInstrumentFeatures(instrument, topicTag) {
+    const container = document.getElementById('dynamicFeatureContainer');
+    
+    // 1. Destroy/Clean up previous loaded feature if switching topics
+    if (currentActiveFeatureInstance && typeof currentActiveFeatureInstance.destroy === 'function') {
+        currentActiveFeatureInstance.destroy();
+        currentActiveFeatureInstance = null;
+    }
+
+    // 2. Instrument / Topic Route Mapping
+    try {
+        if (instrument === 'Vocals') {
+            // Lazy load Vocal Pitch Pipe & Intonation Analyzer
+            const { PitchPipeFeature } = await import('../features/pitchPipe.js');
+            currentActiveFeatureInstance = new PitchPipeFeature(container);
+            currentActiveFeatureInstance.render();
+
+        } else if (['Electric Guitar', 'Acoustic Guitar', 'Bass Guitar'].includes(instrument)) {
+            // Lazy load Chromatic Tuner
+            const { GuitarTunerFeature } = await import('../features/guitarTuner.js');
+            currentActiveFeatureInstance = new GuitarTunerFeature(container);
+            currentActiveFeatureInstance.render();
+
+        } else if (topicTag === 'Scale Pitch Analysis') {
+            // Lazy load WebAudio Pitch Detection Chart (e.g., using Meyda or Pitchy + Chart.js)
+            const { PitchGraphFeature } = await import('../features/pitchGraph.js');
+            currentActiveFeatureInstance = new PitchGraphFeature(container);
+            currentActiveFeatureInstance.render();
+        }
+    } catch (err) {
+        console.error("Failed to load feature module:", err);
+    }
+}
