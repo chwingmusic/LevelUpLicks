@@ -60,21 +60,39 @@ async function getPersonalDatabaseInstance(user) {
 
 async function setupInstrumentOptions() {
     const instSelect = document.getElementById('practiceInstrumentSelect');
-    const dropdownRef = doc(personalDb, `users/${activeUser.uid}/settings`, "dropdown_options");
-    let instruments = ["Electric Guitar", "Acoustic Guitar", "Bass Guitar", "Piano / Keys"];
+    
+    // Path to user settings
+    const settingsRef = doc(personalDb || gatewayDb, `users/${activeUser.uid}/settings`, "practice_config");
+    const fallbackRef = doc(personalDb || gatewayDb, `users/${activeUser.uid}/settings`, "dropdown_options");
+    
+    let userInstruments = [];
 
     try {
-        const snap = await getDoc(dropdownRef);
-        if (snap.exists() && snap.data().instruments) {
-            instruments = snap.data().instruments;
+        // 1. Try reading the user's explicit practice configuration
+        const snap = await getDoc(settingsRef);
+        if (snap.exists() && snap.data().activeInstruments && snap.data().activeInstruments.length > 0) {
+            userInstruments = snap.data().activeInstruments;
+        } else {
+            // 2. Fallback to general dropdown options if practice_config isn't set
+            const fallbackSnap = await getDoc(fallbackRef);
+            if (fallbackSnap.exists() && fallbackSnap.data().instruments && fallbackSnap.data().instruments.length > 0) {
+                userInstruments = fallbackSnap.data().instruments;
+            }
         }
     } catch (e) {
-        console.error("Error fetching instruments:", e);
+        console.error("Error fetching user instrument config:", e);
     }
 
-    instSelect.innerHTML = instruments.map(i => `<option value="${i}">${i}</option>`).join('');
+    // 3. Fallback default if no configuration is found in DB
+    if (userInstruments.length === 0) {
+        userInstruments = ["Electric Guitar"];
+    }
+
+    // Populate ONLY the user's configured instruments
+    instSelect.innerHTML = userInstruments.map(i => `<option value="${i}">${i}</option>`).join('');
     currentInstrument = instSelect.value;
 
+    // Trigger load when switching between configured instruments
     instSelect.addEventListener('change', async () => {
         currentInstrument = instSelect.value;
         await loadDailySession();
