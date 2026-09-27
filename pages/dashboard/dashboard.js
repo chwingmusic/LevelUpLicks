@@ -3,25 +3,23 @@ import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.
 
 let userPracticeLogs = [];
 let activeCalendarDate = new Date();
+let selectedPreset = 'this_month';
 
 export async function initPage() {
     setupRedirectListener();
-    setupPeriodPicker();
+    setupPeriodButtons();
     setupCalendarView();
     
-    // Fetch real logs from Firestore for the active user
     await fetchUserLogs();
-    renderDashboard();
+    applyPresetRange('this_month');
 }
 
-// 1. Fetch real session logs from Firestore
 async function fetchUserLogs() {
     const user = gatewayAuth.currentUser;
     if (!user) return;
 
     try {
         const logsRef = collection(gatewayDb, "practice_logs");
-        // Query sessions for the logged-in user ordered by date
         const q = query(
             logsRef, 
             where("userId", "==", user.uid),
@@ -35,7 +33,7 @@ async function fetchUserLogs() {
             const data = doc.data();
             userPracticeLogs.push({
                 id: doc.id,
-                date: data.date, // Formatted as YYYY-MM-DD
+                date: data.date,
                 category: data.category || 'General',
                 topic: data.topic || 'Untitled Session',
                 key: data.key || null,
@@ -49,7 +47,6 @@ async function fetchUserLogs() {
     }
 }
 
-// Redirects directly to the practice page
 function setupRedirectListener() {
     const btnStart = document.getElementById('btnStartTodaySession');
     if (btnStart) {
@@ -59,35 +56,48 @@ function setupRedirectListener() {
     }
 }
 
-// Handles preset period selection and custom date inputs
-function setupPeriodPicker() {
-    const presetSelect = document.getElementById('presetPeriodSelect');
-    const customRange = document.getElementById('customDateRange');
+function setupPeriodButtons() {
+    const buttons = document.querySelectorAll('.period-btn');
+    const startPicker = document.getElementById('startDatePicker');
+    const endPicker = document.getElementById('endDatePicker');
 
-    if (!presetSelect) return;
+    buttons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            buttons.forEach(b => {
+                b.classList.remove('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
+                b.classList.add('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
+            });
 
-    presetSelect.addEventListener('change', (e) => {
-        if (e.target.value === 'custom') {
-            customRange?.classList.remove('hidden');
-        } else {
-            customRange?.classList.add('hidden');
-            renderDashboard();
-        }
+            const target = e.currentTarget;
+            target.classList.add('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
+            target.classList.remove('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
+
+            selectedPreset = target.getAttribute('data-period');
+            applyPresetRange(selectedPreset);
+        });
     });
 
-    document.getElementById('startDatePicker')?.addEventListener('change', renderDashboard);
-    document.getElementById('endDatePicker')?.addEventListener('change', renderDashboard);
+    startPicker?.addEventListener('change', () => {
+        clearButtonHighlights();
+        renderDashboard();
+    });
+    endPicker?.addEventListener('change', () => {
+        clearButtonHighlights();
+        renderDashboard();
+    });
 }
 
-// Calculate date range objects from the dropdown selection
-function getFilteredDates() {
-    const preset = document.getElementById('presetPeriodSelect')?.value || 'this_month';
+function clearButtonHighlights() {
+    document.querySelectorAll('.period-btn').forEach(b => {
+        b.classList.remove('active', 'bg-amber-500', 'text-zinc-950', 'border-amber-400', 'font-bold');
+        b.classList.add('bg-zinc-950', 'text-zinc-400', 'border-zinc-800', 'font-semibold');
+    });
+}
+
+function applyPresetRange(preset) {
     const now = new Date();
     let start = new Date();
     let end = new Date();
-
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
 
     if (preset === 'this_week') {
         const day = now.getDay();
@@ -106,50 +116,98 @@ function getFilteredDates() {
     } else if (preset === 'last_year') {
         start = new Date(now.getFullYear() - 1, 0, 1);
         end = new Date(now.getFullYear() - 1, 11, 31);
-    } else if (preset === 'custom') {
-        const sVal = document.getElementById('startDatePicker')?.value;
-        const eVal = document.getElementById('endDatePicker')?.value;
-        if (sVal) start = new Date(sVal);
-        if (eVal) end = new Date(eVal);
     }
 
-    return { start, end };
+    const startPicker = document.getElementById('startDatePicker');
+    const endPicker = document.getElementById('endDatePicker');
+
+    if (startPicker) startPicker.value = formatDateForInput(start);
+    if (endPicker) endPicker.value = formatDateForInput(end);
+
+    renderDashboard();
+}
+
+function formatDateForInput(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 function renderDashboard() {
-    const { start, end } = getFilteredDates();
-    
-    // Filter real Firestore logs within selected date range
+    const sVal = document.getElementById('startDatePicker')?.value;
+    const eVal = document.getElementById('endDatePicker')?.value;
+
+    const start = sVal ? new Date(sVal + 'T00:00:00') : new Date(0);
+    const end = eVal ? new Date(eVal + 'T23:59:59') : new Date();
+
+    // 1. Current Period Logs
     const filteredLogs = userPracticeLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= start && logDate <= end;
     });
 
-    // 1. Total Time Calculation
-    const totalMins = filteredLogs.reduce((acc, curr) => acc + curr.minutes, 0);
-    const hoursEl = document.getElementById('statTotalHours');
-    if (hoursEl) hoursEl.innerText = (totalMins / 60).toFixed(1);
+    // 2. Prior Period Logs (Same length in days)
+    const periodDurationMs = end.getTime() - start.getTime();
+    const priorStart = new Date(start.getTime() - periodDurationMs);
+    const priorEnd = new Date(start.getTime() - 1); // Up to 1 millisecond before current start
 
-    // 2. Dynamic Streak Calculation
-    calculateStreak();
+    const priorLogs = userPracticeLogs.filter(log => {
+        const logDate = new Date(log.date + 'T00:00:00');
+        return logDate >= priorStart && logDate <= priorEnd;
+    });
 
-    // 3. Render Real Category Breakdown Cards
+    // 3. Render Metric Cards
+    renderTimeMetric(filteredLogs, priorLogs);
+    calculateStreak(filteredLogs);
+
+    // 4. Render Breakdown & Calendar
     renderCategoryCards(filteredLogs);
-
-    // 4. Update Heatmap Calendar Grid
     renderCalendarGrid();
 }
 
-// Calculate active consecutive practice streak
-function calculateStreak() {
+// Computes real total time and percentage change vs prior period
+function renderTimeMetric(currentLogs, priorLogs) {
+    const currentMins = currentLogs.reduce((acc, curr) => acc + curr.minutes, 0);
+    const priorMins = priorLogs.reduce((acc, curr) => acc + curr.minutes, 0);
+
+    const hoursEl = document.getElementById('statTotalHours');
+    if (hoursEl) hoursEl.innerText = (currentMins / 60).toFixed(1);
+
+    const timeChangeEl = document.getElementById('statTimeChange');
+    if (!timeChangeEl) return;
+
+    if (priorMins === 0) {
+        if (currentMins > 0) {
+            timeChangeEl.innerHTML = `<span class="text-emerald-400 font-bold">▲ +100%</span> vs prior period`;
+        } else {
+            timeChangeEl.innerText = `0 hrs logged in prior period`;
+        }
+    } else {
+        const diffPercent = (((currentMins - priorMins) / priorMins) * 100).toFixed(1);
+        if (diffPercent > 0) {
+            timeChangeEl.innerHTML = `<span class="text-emerald-400 font-bold">▲ +${diffPercent}%</span> vs prior period`;
+        } else if (diffPercent < 0) {
+            timeChangeEl.innerHTML = `<span class="text-rose-400 font-bold">▼ ${diffPercent}%</span> vs prior period`;
+        } else {
+            timeChangeEl.innerHTML = `<span class="text-zinc-400 font-bold">0% change</span> vs prior period`;
+        }
+    }
+}
+
+// Calculates active consecutive streak and practice frequency within selected range
+function calculateStreak(filteredLogs) {
+    const streakSubtextEl = document.querySelector('#statActiveStreak').parentElement.nextElementSibling;
+    
     if (userPracticeLogs.length === 0) {
         const streakEl = document.getElementById('statActiveStreak');
         if (streakEl) streakEl.innerText = '0';
+        if (streakSubtextEl) streakSubtextEl.innerText = 'No practice logs recorded yet';
         return;
     }
 
+    // Active continuous streak from present day
     const uniqueDates = [...new Set(userPracticeLogs.map(l => l.date))].sort().reverse();
-    
     let streak = 0;
     let checkDate = new Date();
     checkDate.setHours(0, 0, 0, 0);
@@ -168,9 +226,14 @@ function calculateStreak() {
 
     const streakEl = document.getElementById('statActiveStreak');
     if (streakEl) streakEl.innerText = streak;
+
+    // Calculate dynamic active days in currently selected range
+    const rangeActiveDays = new Set(filteredLogs.map(l => l.date)).size;
+    if (streakSubtextEl) {
+        streakSubtextEl.innerText = `Practiced on ${rangeActiveDays} distinct day${rangeActiveDays === 1 ? '' : 's'} in this range`;
+    }
 }
 
-// Render dynamic category cards with collapsible topic lists
 function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
     if (!container) return;
@@ -187,7 +250,7 @@ function renderCategoryCards(logs) {
     });
 
     if (Object.keys(categories).length === 0) {
-        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No practice sessions logged in this selected period.</div>`;
+        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No practice sessions logged in this period.</div>`;
         return;
     }
 
@@ -226,7 +289,6 @@ function renderCategoryCards(logs) {
     }).join('');
 }
 
-// Month Heatmap View
 function setupCalendarView() {
     const prevBtn = document.getElementById('btnPrevMonth');
     const nextBtn = document.getElementById('btnNextMonth');
@@ -267,7 +329,6 @@ function renderCalendarGrid() {
 
     for (let day = 1; day <= totalDaysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
         const dayLogs = userPracticeLogs.filter(l => l.date === dateStr);
         const totalMins = dayLogs.reduce((acc, curr) => acc + curr.minutes, 0);
 
