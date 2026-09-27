@@ -15,7 +15,7 @@ export async function initPage() {
     applyPresetRange('this_month');
 }
 
-// 1. Helper to retrieve or initialize the user's personal Firebase/Firestore instance
+// Helper to retrieve user's personal Firestore instance
 async function getPersonalDatabaseInstance(user) {
     try {
         const snapshot = await getDoc(doc(gatewayDb, "user_configs", user.uid));
@@ -34,16 +34,12 @@ async function getPersonalDatabaseInstance(user) {
     return gatewayDb;
 }
 
-// 2. Fetch practice logs from the personal DB instance
 async function fetchUserLogs() {
     const user = gatewayAuth.currentUser;
     if (!user) return;
 
     try {
-        // Retrieve personal Firestore instance
         const db = await getPersonalDatabaseInstance(user);
-
-        // Fetch logs directly from the personal instance's practice_logs collection
         const logsRef = collection(db, "practice_logs");
         const q = query(
             logsRef, 
@@ -165,13 +161,13 @@ function renderDashboard() {
     const start = sVal ? new Date(sVal + 'T00:00:00') : new Date(0);
     const end = eVal ? new Date(eVal + 'T23:59:59') : new Date();
 
-    // 1. Current Period Logs
+    // 1. Current Period
     const filteredLogs = userPracticeLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= start && logDate <= end;
     });
 
-    // 2. Prior Period Logs
+    // 2. Prior Period Comparison
     const periodDurationMs = end.getTime() - start.getTime();
     const priorStart = new Date(start.getTime() - periodDurationMs);
     const priorEnd = new Date(start.getTime() - 1);
@@ -181,11 +177,9 @@ function renderDashboard() {
         return logDate >= priorStart && logDate <= priorEnd;
     });
 
-    // 3. Metrics
+    // 3. Render Cards & Grid
     renderTimeMetric(filteredLogs, priorLogs);
     calculateStreak(filteredLogs);
-
-    // 4. Visual Components
     renderCategoryCards(filteredLogs);
     renderCalendarGrid();
 }
