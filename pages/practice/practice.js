@@ -322,8 +322,8 @@ window.addSingleTopicToSession = async (topicId) => {
     await loadDailySession();
 };
 
-// Open Practice Workspace Modal
-window.openFocusModal = (cardId) => {
+// Open Practice Workspace Modal FIXED (Added 'async')
+window.openFocusModal = async (cardId) => {
     activeCardEditing = activeSessionItems.find(x => x.id === cardId);
     if (!activeCardEditing) return;
 
@@ -561,6 +561,7 @@ let currentActiveFeatureInstance = null;
 
 async function loadInstrumentFeatures(instrument, topicTag) {
     const container = document.getElementById('dynamicFeatureContainer');
+    if (!container) return; // Safeguard if slot doesn't exist in HTML
     
     // 1. Clean up any previously loaded feature module
     if (currentActiveFeatureInstance && typeof currentActiveFeatureInstance.destroy === 'function') {
@@ -571,7 +572,6 @@ async function loadInstrumentFeatures(instrument, topicTag) {
     // 2. Import modules directly from the root `/features/` folder
     try {
         if (instrument === 'Vocals') {
-            // Path: pages/practice/ -> practice/ -> root / features / pitchPipe.js
             const { PitchPipeFeature } = await import('../../features/pitchPipe.js');
             currentActiveFeatureInstance = new PitchPipeFeature(container);
             currentActiveFeatureInstance.render();
