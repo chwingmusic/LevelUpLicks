@@ -1,5 +1,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { 
+    getAuth, 
+    signInWithPopup, 
+    signInWithRedirect, 
+    getRedirectResult, 
+    GoogleAuthProvider, 
+    signOut, 
+    onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const gatewayConfig = {
@@ -16,6 +24,11 @@ const gatewayConfig = {
 export const gatewayApp = initializeApp(gatewayConfig);
 export const gatewayAuth = getAuth(gatewayApp);
 export const gatewayDb = getFirestore(gatewayApp);
+
+// Catch redirect authentication results (Required for mobile redirect flow)
+getRedirectResult(gatewayAuth).catch((error) => {
+    console.error("Redirect auth error:", error);
+});
 
 // View mapping router config
 const viewRoutes = {
@@ -88,16 +101,30 @@ document.querySelectorAll('.nav-link').forEach(btn => {
     });
 });
 
-// Login Button Listener
+// Helper to check for Mobile Devices
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
+
+// Login Button Listener with Mobile-Safe Fallback
 const btnLogin = document.getElementById('btnLogin');
 if (btnLogin) {
     btnLogin.addEventListener('click', async () => {
-        try {
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(gatewayAuth, provider);
-        } catch (error) {
-            console.error("Google Auth Failure:", error);
-            alert(`Sign-in failed: ${error.message}`);
+        const provider = new GoogleAuthProvider();
+        
+        // Custom parameter ensures fresh account selection without hanging state
+        provider.setCustomParameters({ prompt: 'select_account' });
+
+        if (isMobileDevice()) {
+            // Direct redirect on mobile prevents sessionStorage partitioning errors
+            await signInWithRedirect(gatewayAuth, provider);
+        } else {
+            try {
+                await signInWithPopup(gatewayAuth, provider);
+            } catch (error) {
+                console.warn("Popup blocked or failed, falling back to redirect:", error);
+                await signInWithRedirect(gatewayAuth, provider);
+            }
         }
     });
 }
