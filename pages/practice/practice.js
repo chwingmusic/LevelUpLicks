@@ -361,6 +361,9 @@ window.openFocusModal = (cardId) => {
     updateMetronomePulseLabel();
     resetTimer(); // Timer initialized at 00:00 without auto-starting
 
+    // Inject active instrument plugin feature
+    await loadInstrumentFeatures(currentInstrument, activeCardEditing.tag);
+
     document.getElementById('focusPracticeModal').classList.remove('hidden');
 };
 
