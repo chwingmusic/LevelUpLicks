@@ -191,7 +191,10 @@ function updateDailyStats() {
 async function generateRandomRoutine() {
     const dbToUse = personalDb || gatewayDb;
     const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
-    const catalog = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.instrument || t.instrument === currentInstrument);
+    // Filter catalog by instrument AND require the "Daily Routine" tag
+    const catalog = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(t => (!t.instrument || t.instrument === currentInstrument) && t.tag === 'Daily Routine');
 
     if (catalog.length === 0) {
         alert(`No topics found for ${currentInstrument} in catalog.`);
