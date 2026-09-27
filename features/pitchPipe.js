@@ -35,94 +35,110 @@ export class PitchPipeFeature {
 
     bindEvents() {
         this.container.querySelectorAll('.pitch-pipe-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.playTone(btn.dataset.note));
+            btn.addEventListener('click', (e) => {
+                // Use currentTarget to guarantee dataset reading from the <button>
+                const note = e.currentTarget.dataset.note;
+                if (note) {
+                    this.playTone(note);
+                }
+            });
         });
     }
 
     async playTone(note) {
-        // 1. Initialize audio context if not created yet
-        if (!this.audioCtx) {
-            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        // 2. Resume context if suspended by browser autoplay policy
-        if (this.audioCtx.state === 'suspended') {
-            await this.audioCtx.resume();
-        }
-
-        // 3. Toggle off if clicking the currently playing note
-        if (this.activeNote === note) {
-            this.stopTone();
-            return;
-        }
-
-        // 4. Stop any currently active note before starting a new one
-        this.stopTone();
-
-        const freq = this.frequencies[note];
-        if (!freq) return;
-
-        // 5. Create Web Audio Nodes
-        this.activeOscillator = this.audioCtx.createOscillator();
-        this.activeGainNode = this.audioCtx.createGain();
-
-        // Sine wave gives a clean, clear tone suitable for vocal reference
-        this.activeOscillator.type = 'sine';
-        this.activeOscillator.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
-
-        // Smooth fade-in to prevent clicking artifacts
-        this.activeGainNode.gain.setValueAtTime(0, this.audioCtx.currentTime);
-        this.activeGainNode.gain.linearRampToValueAtTime(0.3, this.audioCtx.currentTime + 0.05);
-
-        // Connect nodes to speakers
-        this.activeOscillator.connect(this.activeGainNode);
-        this.activeGainNode.connect(this.audioCtx.destination);
-
-        this.activeOscillator.start();
-        this.activeNote = note;
-
-        // 6. Update Button UI & Status Text
-        const statusEl = this.container.querySelector('#pitchPipeStatus');
-        if (statusEl) {
-            statusEl.innerText = `Playing: ${note}`;
-            statusEl.className = "text-[11px] font-mono font-bold text-violet-400";
-        }
-
-        this.container.querySelectorAll('.pitch-pipe-btn').forEach(btn => {
-            if (btn.dataset.note === note) {
-                btn.classList.add('bg-violet-600', 'ring-2', 'ring-violet-400');
-                btn.classList.remove('bg-zinc-800');
-            } else {
-                btn.classList.remove('bg-violet-600', 'ring-2', 'ring-violet-400');
-                btn.classList.add('bg-zinc-800');
+        try {
+            // 1. Initialize Audio Context on demand
+            if (!this.audioCtx) {
+                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-        });
+
+            // 2. Resume Context if browser suspended autoplay
+            if (this.audioCtx.state === 'suspended') {
+                await this.audioCtx.resume();
+            }
+
+            // 3. Toggle off if clicking the note that is currently playing
+            if (this.activeNote === note) {
+                this.stopTone();
+                return;
+            }
+
+            // 4. Stop any playing note before starting a new one
+            this.stopTone();
+
+            const freq = this.frequencies[note];
+            if (!freq) return;
+
+            // 5. Build Web Audio Nodes
+            this.activeOscillator = this.audioCtx.createOscillator();
+            this.activeGainNode = this.audioCtx.createGain();
+
+            this.activeOscillator.type = 'sine';
+            this.activeOscillator.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+
+            // Smooth volume ramp to eliminate clicks
+            this.activeGainNode.gain.setValueAtTime(0.001, this.audioCtx.currentTime);
+            this.activeGainNode.gain.exponentialRampToValueAtTime(0.3, this.audioCtx.currentTime + 0.05);
+
+            this.activeOscillator.connect(this.activeGainNode);
+            this.activeGainNode.connect(this.audioCtx.destination);
+
+            this.activeOscillator.start();
+            this.activeNote = note;
+
+            // 6. Update UI & Highlight Button
+            this.updateUI(note);
+
+        } catch (err) {
+            console.error("Audio Context Playback Failed:", err);
+        }
     }
 
     stopTone() {
         if (this.activeGainNode && this.audioCtx) {
-            // Smooth fade-out before stopping
-            this.activeGainNode.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 0.05);
-            setTimeout(() => {
-                if (this.activeOscillator) {
-                    this.activeOscillator.stop();
-                    this.activeOscillator.disconnect();
-                    this.activeOscillator = null;
-                }
-            }, 50);
+            try {
+                this.activeGainNode.gain.setValueAtTime(this.activeGainNode.gain.value, this.audioCtx.currentTime);
+                this.activeGainNode.gain.exponentialRampToValueAtTime(0.0001, this.audioCtx.currentTime + 0.05);
+                
+                const oscToStop = this.activeOscillator;
+                setTimeout(() => {
+                    if (oscToStop) {
+                        oscToStop.stop();
+                        oscToStop.disconnect();
+                    }
+                }, 50);
+            } catch (e) {
+                console.warn("Error stopping oscillator:", e);
+            }
         }
 
+        this.activeOscillator = null;
+        this.activeGainNode = null;
         this.activeNote = null;
 
+        this.updateUI(null);
+    }
+
+    updateUI(activeNote) {
         const statusEl = this.container.querySelector('#pitchPipeStatus');
         if (statusEl) {
-            statusEl.innerText = "Off";
-            statusEl.className = "text-[11px] font-mono text-zinc-500";
+            if (activeNote) {
+                statusEl.innerText = `Playing: ${activeNote}`;
+                statusEl.className = "text-[11px] font-mono font-bold text-violet-400";
+            } else {
+                statusEl.innerText = "Off";
+                statusEl.className = "text-[11px] font-mono text-zinc-500";
+            }
         }
 
         this.container.querySelectorAll('.pitch-pipe-btn').forEach(btn => {
-            btn.classList.remove('bg-violet-600', 'ring-2', 'ring-violet-400');
-            btn.classList.add('bg-zinc-800');
+            if (activeNote && btn.dataset.note === activeNote) {
+                btn.classList.add('bg-violet-600', 'ring-2', 'ring-violet-400', 'scale-105');
+                btn.classList.remove('bg-zinc-800');
+            } else {
+                btn.classList.remove('bg-violet-600', 'ring-2', 'ring-violet-400', 'scale-105');
+                btn.classList.add('bg-zinc-800');
+            }
         });
     }
 
