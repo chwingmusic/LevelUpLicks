@@ -1,4 +1,4 @@
-import { gatewayAuth, gatewayDb, loadViewRouter } from '../../app.js';
+import { gatewayAuth, gatewayDb, loadViewRouter } from '../../main.js';
 import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 let userPracticeLogs = [];
@@ -68,9 +68,9 @@ function setupPeriodPicker() {
 
     presetSelect.addEventListener('change', (e) => {
         if (e.target.value === 'custom') {
-            customRange.classList.remove('hidden');
+            customRange?.classList.remove('hidden');
         } else {
-            customRange.classList.add('hidden');
+            customRange?.classList.add('hidden');
             renderDashboard();
         }
     });
@@ -86,7 +86,6 @@ function getFilteredDates() {
     let start = new Date();
     let end = new Date();
 
-    // Standardize to midnight for accurate date comparisons
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
@@ -144,11 +143,11 @@ function renderDashboard() {
 // Calculate active consecutive practice streak
 function calculateStreak() {
     if (userPracticeLogs.length === 0) {
-        document.getElementById('statActiveStreak').innerText = '0';
+        const streakEl = document.getElementById('statActiveStreak');
+        if (streakEl) streakEl.innerText = '0';
         return;
     }
 
-    // Get unique sorted practice dates
     const uniqueDates = [...new Set(userPracticeLogs.map(l => l.date))].sort().reverse();
     
     let streak = 0;
@@ -176,7 +175,6 @@ function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
     if (!container) return;
 
-    // Group logs by Category -> Topic
     const categories = {};
     logs.forEach(log => {
         if (!categories[log.category]) {
@@ -214,7 +212,6 @@ function renderCategoryCards(logs) {
                     </span>
                 </div>
 
-                <!-- Collapsible Topics List -->
                 <details class="group">
                     <summary class="text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer flex items-center justify-between font-semibold pt-1">
                         <span>Topic Breakdown (${Object.keys(catData.topics).length})</span>
@@ -245,7 +242,7 @@ function setupCalendarView() {
     });
 
     document.getElementById('btnCloseDayDetails')?.addEventListener('click', () => {
-        document.getElementById('dayDetailsPanel').classList.add('hidden');
+        document.getElementById('dayDetailsPanel')?.classList.add('hidden');
     });
 }
 
@@ -264,20 +261,16 @@ function renderCalendarGrid() {
 
     grid.innerHTML = '';
 
-    // Calendar lead-in spaces
     for (let i = 0; i < firstDayIndex; i++) {
         grid.innerHTML += `<div class="h-10 bg-zinc-950/40 rounded-xl opacity-30"></div>`;
     }
 
-    // Days of the month
     for (let day = 1; day <= totalDaysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // Filter real user logs for this specific calendar date
         const dayLogs = userPracticeLogs.filter(l => l.date === dateStr);
         const totalMins = dayLogs.reduce((acc, curr) => acc + curr.minutes, 0);
 
-        // Heatmap Color scaling based on volume (minutes)
         let bgClass = "bg-zinc-800/80 text-zinc-400";
         if (totalMins > 0 && totalMins <= 20) bgClass = "bg-amber-950/80 text-amber-300 border border-amber-900/50";
         else if (totalMins > 20 && totalMins <= 45) bgClass = "bg-amber-800/80 text-amber-200 border border-amber-700/50";
@@ -293,7 +286,6 @@ function renderCalendarGrid() {
     }
 }
 
-// Expands panel below calendar showing practices on selected date
 function showDayDetails(dateStr, logs) {
     const panel = document.getElementById('dayDetailsPanel');
     const title = document.getElementById('selectedDateTitle');
