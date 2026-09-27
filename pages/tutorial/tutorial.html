@@ -1,32 +1,109 @@
-<div class="space-y-6">
-    <div class="flex flex-col space-y-1 border-b border-zinc-800/80 pb-4">
-        <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Bring Your Own Database (BYODB) Setup</h2>
-        <p class="text-xs text-zinc-400">Step-by-step instructions to create a 100% free personal Firebase instance.</p>
+<div class="p-6 space-y-8 max-w-5xl mx-auto text-zinc-100">
+    <!-- Header Section -->
+    <div class="border-b border-zinc-800 pb-5">
+        <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                100% Free & Private
+            </span>
+        </div>
+        <h1 class="text-3xl font-black text-white tracking-tight mt-2 flex items-center gap-2">
+            📖 Bring Your Own Database (BYODB) Guide
+        </h1>
+        <p class="text-sm text-zinc-400 mt-1 max-w-2xl">
+            Never lose your practice data! Follow this beginner-friendly step-by-step guide to connect your own free Google Firebase database in less than 5 minutes. No coding required.
+        </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
-            <span class="text-amber-400 font-bold font-mono text-xs">STEP 01</span>
-            <h3 class="text-sm font-bold text-white">Create Firebase Project</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Go to <a href="https://console.firebase.google.com" target="_blank" class="text-amber-400 underline">firebase.google.com</a>, sign in, click <strong>"Add Project"</strong>, and name it <code class="text-emerald-400">LevelUpLicks</code>.</p>
+    <!-- Step 1 -->
+    <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
+                    01
+                </span>
+                <h2 class="text-base font-bold text-white">Create Your Free Firebase Account & Project</h2>
+            </div>
+            <a href="https://console.firebase.google.com/" target="_blank" class="text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1">
+                Open Firebase Console ↗
+            </a>
         </div>
 
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
-            <span class="text-amber-400 font-bold font-mono text-xs">STEP 02</span>
-            <h3 class="text-sm font-bold text-white">Register Web Application</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Inside Project Overview, click the Web icon (<code class="text-amber-400">&lt;/&gt;</code>) to register an app. Copy the generated <code class="text-emerald-400">firebaseConfig</code> object JSON.</p>
+        <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
+            <li>Click the button above to go to <strong>firebase.google.com</strong> and sign in using your regular Google/Gmail account.</li>
+            <li>Click the big blue <strong>"+ Add project"</strong> (or "Create a project") button.</li>
+            <li>Type <code>LevelUpLicks</code> (or any name you like) as your Project Name, then click <strong>Continue</strong>.</li>
+            <li><strong>Disable Google Analytics</strong> for this project (you don't need it), then click <strong>Create Project</strong>.</li>
+            <li>Wait a few seconds for Firebase to setup your project, then click <strong>Continue</strong> when it says "Your new project is ready".</li>
+        </ol>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center gap-3 border-b border-zinc-800 pb-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
+                02
+            </span>
+            <h2 class="text-base font-bold text-white">Register a Web App & Copy API Keys</h2>
         </div>
 
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
-            <span class="text-amber-400 font-bold font-mono text-xs">STEP 03</span>
-            <h3 class="text-sm font-bold text-white">Enable Firestore & Auth</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Under Authentication, enable <strong>Google Sign-In</strong>. Under Firestore Database, click <strong>Create Database</strong> in Test Mode.</p>
+        <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
+            <li>On your Project Overview page, click the circular <strong>Web icon (<code>&lt;/&gt;</code>)</strong> under "Get started by adding Firebase to your app".</li>
+            <li>Type <code>LevelUpLicks Web</code> in the "App nickname" box. (Leave "Firebase Hosting" unchecked).</li>
+            <li>Click <strong>Register app</strong>.</li>
+            <li>You will now see a box with code labeled <code>const firebaseConfig = { ... };</code>.</li>
+            <li>Copy **ONLY** the Javascript object portion between the curly braces `{ ... }` as shown below:</li>
+        </ol>
+
+        <!-- Visual Code Example -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs text-amber-300/90 space-y-1 relative">
+            <div class="text-[10px] text-zinc-500 uppercase font-sans font-bold mb-2">Example of what to copy:</div>
+            <div>{</div>
+            <div class="pl-4">"apiKey": "AIzaSyD-EXAMPLE_KEY_HERE_12345",</div>
+            <div class="pl-4">"authDomain": "your-app.firebaseapp.com",</div>
+            <div class="pl-4">"projectId": "your-app-id",</div>
+            <div class="pl-4">"storageBucket": "your-app.appspot.com",</div>
+            <div class="pl-4">"messagingSenderId": "123456789",</div>
+            <div class="pl-4">"appId": "1:123456789:web:abcdef123456"</div>
+            <div>}</div>
+        </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center gap-3 border-b border-zinc-800 pb-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
+                03
+            </span>
+            <h2 class="text-base font-bold text-white">Enable Cloud Firestore Database</h2>
         </div>
 
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl space-y-2">
-            <span class="text-amber-400 font-bold font-mono text-xs">STEP 04</span>
-            <h3 class="text-sm font-bold text-white">Paste into Configuration</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Head over to the <strong>Configuration</strong> page, paste your JSON block, and click <strong>Connect Personal Instance</strong>.</p>
+        <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
+            <li>On the left sidebar of your Firebase Console, click <strong>Build</strong> ➔ <strong>Firestore Database</strong>.</li>
+            <li>Click the <strong>Create database</strong> button.</li>
+            <li>Choose a location closest to you (e.g., <code>asia-east1</code> or <code>us-central</code>) and click <strong>Next</strong>.</li>
+            <li>Select <strong>Start in test mode</strong> (this lets your practice app read and write data immediately), then click <strong>Create</strong>.</li>
+        </ol>
+
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300 flex items-start gap-2">
+            <span>💡</span>
+            <span><strong>Pro Tip:</strong> To keep your database open permanently without 30-day expiration warnings, go to the <strong>Rules</strong> tab inside Firestore and set <code>allow read, write: if true;</code> then click <strong>Publish</strong>.</span>
         </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center gap-3 border-b border-zinc-800 pb-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black flex items-center justify-center text-sm">
+                04
+            </span>
+            <h2 class="text-base font-bold text-white">Paste JSON into LevelUpLicks Configuration</h2>
+        </div>
+
+        <ol class="list-decimal list-inside space-y-2 text-xs text-zinc-300 leading-relaxed">
+            <li>Click on the <strong>Configuration</strong> page on the left menu of this app.</li>
+            <li>Paste the copied `{ "apiKey": ... }` JSON block directly into the text area.</li>
+            <li>Click <strong>Connect Personal Instance</strong>.</li>
+            <li>You're all set! Your practice logs and routines will now save directly into your private Google database! 🎉</li>
+        </ol>
     </div>
 </div>
