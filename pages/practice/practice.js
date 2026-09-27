@@ -2,7 +2,6 @@ import { gatewayAuth, gatewayDb } from '../../main.js';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
-// System defaults for random key/mode generator
 const KEYS_LIST = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"];
 const MODES_LIST = ["Ionian (Major)", "Dorian", "Phrygian", "Lydian", "Mixolydian", "Aeolian (Minor)", "Locrian", "Harmonic Minor", "Melodic Minor"];
 
@@ -14,14 +13,14 @@ let activeCatalog = [];
 let activeSessionItems = [];
 let activeCardEditing = null;
 
-// Audio & Timer state
+// Audio & Timer State
 let audioCtx = null;
 let metronomeInterval = null;
 let isMetronomePlaying = false;
+let isTimerRunning = false;
 let timerInterval = null;
 let elapsedSeconds = 0;
 
-// 1. Logical 4 AM Date Calculation
 function getLogicalDateString(dateObj = new Date()) {
     const adjusted = new Date(dateObj.getTime() - (4 * 60 * 60 * 1000));
     return adjusted.toISOString().split('T')[0];
@@ -100,19 +99,32 @@ function setupEventListeners() {
     document.getElementById('btnSaveCardPartial').addEventListener('click', () => saveFocusCard(false));
     document.getElementById('btnCompleteCard').addEventListener('click', () => saveFocusCard(true));
 
-    // Metronome UI
-    document.getElementById('metroBpmSlider').addEventListener('input', (e) => {
-        document.getElementById('metroBpmDisplay').innerText = `${e.target.value} BPM`;
+    // Metronome BPM Sync
+    const bpmSlider = document.getElementById('metroBpmSlider');
+    const singleBpmInput = document.getElementById('focusSingleBpm');
+
+    bpmSlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        document.getElementById('metroBpmDisplay').innerText = `${val} BPM`;
+        singleBpmInput.value = val;
+        if (isMetronomePlaying) restartMetronome();
     });
+
+    singleBpmInput.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value) || 120;
+        bpmSlider.value = val;
+        document.getElementById('metroBpmDisplay').innerText = `${val} BPM`;
+        if (isMetronomePlaying) restartMetronome();
+    });
+
+    document.getElementById('focusTimeSigSelect').addEventListener('change', updateMetronomePulseLabel);
     document.getElementById('btnToggleMetronome').addEventListener('click', toggleMetronome);
 
-    // Timer UI
-    document.getElementById('btnStartTimer').addEventListener('click', startTimer);
-    document.getElementById('btnPauseTimer').addEventListener('click', pauseTimer);
+    // Simplified Stopwatch Toggle & Reset
+    document.getElementById('btnToggleTimer').addEventListener('click', toggleTimer);
     document.getElementById('btnResetTimer').addEventListener('click', resetTimer);
 }
 
-// Load practice items for chosen Instrument + Date
 async function loadDailySession() {
     const dbToUse = personalDb || gatewayDb;
     const sessionPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items`;
@@ -125,6 +137,16 @@ async function loadDailySession() {
     } catch (err) {
         console.error("Error loading session:", err);
     }
+}
+
+function formatCardTitle(item) {
+    const keyStr = item.key && item.key !== '(None)' ? item.key : '';
+    const modeStr = item.mode && item.mode !== '(None)' ? item.mode : '';
+    const timeSigStr = item.timeSignature && item.timeSignature !== '(None)' ? item.timeSignature : '';
+    const bpmStr = item.targetBpm ? `${item.targetBpm} BPM` : '';
+
+    const metaParts = [keyStr, modeStr, timeSigStr, bpmStr].filter(Boolean).join(' ');
+    return metaParts ? `${item.title} — ${metaParts}` : item.title;
 }
 
 function renderSessionDeck() {
@@ -147,13 +169,8 @@ function renderSessionDeck() {
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded ${item.completed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${item.tag || 'Routine'}</span>
                     <span class="text-xs font-semibold ${item.completed ? 'text-emerald-400' : 'text-zinc-500'}">${item.completed ? '✅ Done' : '⏳ Pending'}</span>
                 </div>
-                <h4 class="text-sm font-bold text-white">${item.title}</h4>
+                <h4 class="text-sm font-bold text-white tracking-tight leading-snug">${formatCardTitle(item)}</h4>
                 <p class="text-xs text-zinc-400">${item.category} • ${item.subCategory || 'General'}</p>
-                <div class="flex flex-wrap gap-1.5 text-[10px] text-zinc-400 pt-1">
-                    ${item.key && item.key !== '(None)' ? `<span class="bg-zinc-800 px-2 py-0.5 rounded">Key: ${item.key}</span>` : ''}
-                    ${item.mode && item.mode !== '(None)' ? `<span class="bg-zinc-800 px-2 py-0.5 rounded">Mode: ${item.mode}</span>` : ''}
-                    ${item.achievedBpm ? `<span class="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded font-mono">${item.achievedBpm} BPM</span>` : ''}
-                </div>
             </div>
             <div class="border-t border-zinc-800/60 pt-2 flex items-center justify-between text-[11px] text-zinc-400">
                 <span>⏱️ ${item.durationMins || 0} mins spent</span>
@@ -171,14 +188,13 @@ function updateDailyStats() {
     document.getElementById('statTotalTime').innerText = `${totalMins}m`;
 }
 
-// Random Routine Generator Algorithm
 async function generateRandomRoutine() {
     const dbToUse = personalDb || gatewayDb;
     const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
     const catalog = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !t.instrument || t.instrument === currentInstrument);
 
     if (catalog.length === 0) {
-        alert(`No topics found for ${currentInstrument} in your catalog. Please add topics in Configuration first.`);
+        alert(`No topics found for ${currentInstrument} in catalog.`);
         return;
     }
 
@@ -200,6 +216,7 @@ async function generateRandomRoutine() {
             mode: randomTopic.mode && randomTopic.mode !== '(None)' ? randomTopic.mode : randomMode,
             timeSignature: randomTopic.timeSignature || '4/4',
             targetMinutes: randomTopic.targetMinutes || 15,
+            targetBpm: randomTopic.targetBpm || 120,
             resourceUrl: randomTopic.resourceUrl || '',
             notes: randomTopic.notes || '',
             attachments: randomTopic.attachments || [],
@@ -225,7 +242,6 @@ async function clearDailyRoutine() {
     await loadDailySession();
 }
 
-// Manual Add Topic Modal
 async function openAddTopicModal() {
     const dbToUse = personalDb || gatewayDb;
     const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
@@ -262,6 +278,7 @@ window.addSingleTopicToSession = async (topicId) => {
         mode: t.mode || '(None)',
         timeSignature: t.timeSignature || '4/4',
         targetMinutes: t.targetMinutes || 15,
+        targetBpm: t.targetBpm || 120,
         resourceUrl: t.resourceUrl || '',
         notes: t.notes || '',
         attachments: t.attachments || [],
@@ -275,7 +292,7 @@ window.addSingleTopicToSession = async (topicId) => {
     await loadDailySession();
 };
 
-// Expandable Focus Workspace Modal
+// Open Practice Workspace Modal
 window.openFocusModal = (cardId) => {
     activeCardEditing = activeSessionItems.find(x => x.id === cardId);
     if (!activeCardEditing) return;
@@ -288,13 +305,16 @@ window.openFocusModal = (cardId) => {
     fillSelectOptions('focusModeSelect', MODES_LIST, activeCardEditing.mode);
     fillSelectOptions('focusTimeSigSelect', ["4/4", "3/4", "6/8", "12/8", "5/4", "7/8"], activeCardEditing.timeSignature);
 
+    const initialBpm = activeCardEditing.targetBpm || 120;
     document.getElementById('focusTargetMins').value = activeCardEditing.targetMinutes || 15;
-    document.getElementById('focusTargetBpm').value = activeCardEditing.targetBpm || '';
-    document.getElementById('focusAchievedBpm').value = activeCardEditing.achievedBpm || '';
+    document.getElementById('focusSingleBpm').value = initialBpm;
+    document.getElementById('metroBpmSlider').value = initialBpm;
+    document.getElementById('metroBpmDisplay').innerText = `${initialBpm} BPM`;
+
     document.getElementById('focusDurationMins').value = activeCardEditing.durationMins || '';
     document.getElementById('focusSessionNotes').value = activeCardEditing.sessionNotes || activeCardEditing.notes || '';
 
-    // Render Resources
+    // Render Attachments
     const resContainer = document.getElementById('focusResourcesContainer');
     resContainer.innerHTML = `
         ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
@@ -308,8 +328,8 @@ window.openFocusModal = (cardId) => {
         ` : ''}
     `;
 
-    resetTimer();
-    startTimer();
+    updateMetronomePulseLabel();
+    resetTimer(); // Timer initialized at 00:00 without auto-starting
 
     document.getElementById('focusPracticeModal').classList.remove('hidden');
 };
@@ -320,7 +340,7 @@ function fillSelectOptions(elementId, list, selected) {
 }
 
 function closeFocusModal() {
-    pauseTimer();
+    stopTimer();
     stopMetronome();
     document.getElementById('focusPracticeModal').classList.add('hidden');
 }
@@ -328,19 +348,15 @@ function closeFocusModal() {
 async function saveFocusCard(isCompleted) {
     if (!activeCardEditing) return;
 
-    // Convert elapsed stopwatch seconds into rounded minutes
-    const timerMins = Math.ceil(elapsedSeconds / 60);
-    const manualMins = parseInt(document.getElementById('focusDurationMins').value);
-    const finalDuration = manualMins || timerMins || 0;
+    const manualMins = parseInt(document.getElementById('focusDurationMins').value) || Math.ceil(elapsedSeconds / 60);
 
     const payload = {
         key: document.getElementById('focusKeySelect').value,
         mode: document.getElementById('focusModeSelect').value,
         timeSignature: document.getElementById('focusTimeSigSelect').value,
         targetMinutes: parseInt(document.getElementById('focusTargetMins').value) || 15,
-        targetBpm: parseInt(document.getElementById('focusTargetBpm').value) || null,
-        achievedBpm: parseInt(document.getElementById('focusAchievedBpm').value) || null,
-        durationMins: finalDuration,
+        targetBpm: parseInt(document.getElementById('focusSingleBpm').value) || 120,
+        durationMins: manualMins,
         sessionNotes: document.getElementById('focusSessionNotes').value.trim(),
         completed: isCompleted,
         updatedAt: new Date().toISOString()
@@ -355,11 +371,26 @@ async function saveFocusCard(isCompleted) {
     await loadDailySession();
 }
 
-// Web Audio API Metronome Engine
+// Time Signature & Metronome Pulse Logic
+function updateMetronomePulseLabel() {
+    const sig = document.getElementById('focusTimeSigSelect').value;
+    const label = document.getElementById('metroPulseNoteType');
+
+    if (sig === '6/8' || sig === '12/8') {
+        label.innerText = '♩. = Dotted Quarter Note';
+    } else {
+        label.innerText = '♩ = Quarter Note';
+    }
+}
+
 function toggleMetronome() {
+    if (isMetronomePlaying) stopMetronome();
+    else startMetronome();
+}
+
+function restartMetronome() {
     if (isMetronomePlaying) {
         stopMetronome();
-    } else {
         startMetronome();
     }
 }
@@ -372,8 +403,20 @@ function startMetronome() {
     btn.innerText = "⏸ Stop Metronome";
     btn.className = "w-full py-2 rounded-xl bg-rose-500 text-white font-bold text-xs hover:bg-rose-400 transition-colors";
 
-    const playClick = () => {
+    const playPulse = () => {
         const bpm = parseInt(document.getElementById('metroBpmSlider').value) || 120;
+        const timeSig = document.getElementById('focusTimeSigSelect').value;
+
+        // Interval calculation based on meter
+        let intervalMs;
+        if (timeSig === '6/8' || timeSig === '12/8') {
+            // Compound meter: BPM represents dotted quarter notes
+            intervalMs = (60 / bpm) * 1000;
+        } else {
+            // Simple meter: BPM represents quarter notes
+            intervalMs = (60 / bpm) * 1000;
+        }
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
 
@@ -386,17 +429,16 @@ function startMetronome() {
         osc.start();
         osc.stop(audioCtx.currentTime + 0.05);
 
-        // Flash Indicator
         const indicator = document.getElementById('metroBeatIndicator');
         indicator.className = "h-3 w-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/50";
         setTimeout(() => {
             indicator.className = "h-3 w-3 rounded-full bg-zinc-700 transition-all";
         }, 100);
 
-        metronomeInterval = setTimeout(playClick, (60 / bpm) * 1000);
+        metronomeInterval = setTimeout(playPulse, intervalMs);
     };
 
-    playClick();
+    playPulse();
 }
 
 function stopMetronome() {
@@ -409,22 +451,47 @@ function stopMetronome() {
     }
 }
 
-// Practice Timer Functions
+// Stopwatch Control Logic
+function toggleTimer() {
+    if (isTimerRunning) {
+        stopTimer();
+    } else {
+        startTimer();
+    }
+}
+
 function startTimer() {
-    if (timerInterval) return;
+    isTimerRunning = true;
+    const btn = document.getElementById('btnToggleTimer');
+    btn.innerText = "⏸ Pause Timer";
+    btn.className = "flex-1 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold text-xs hover:bg-amber-500/30";
+
     timerInterval = setInterval(() => {
         elapsedSeconds++;
         updateTimerDisplay();
     }, 1000);
 }
 
-function pauseTimer() {
+function stopTimer() {
+    isTimerRunning = false;
     clearInterval(timerInterval);
     timerInterval = null;
+
+    const btn = document.getElementById('btnToggleTimer');
+    if (btn) {
+        btn.innerText = "▶ Start Timer";
+        btn.className = "flex-1 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs hover:bg-emerald-500/30";
+    }
+
+    // Auto-update duration spent upon stopping/pausing stopwatch
+    if (elapsedSeconds > 0) {
+        const computedMins = Math.ceil(elapsedSeconds / 60);
+        document.getElementById('focusDurationMins').value = computedMins;
+    }
 }
 
 function resetTimer() {
-    pauseTimer();
+    stopTimer();
     elapsedSeconds = 0;
     updateTimerDisplay();
 }
