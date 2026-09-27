@@ -286,13 +286,18 @@ function calculateStreak(filteredLogs) {
 
 /**
  * Category Breakdown Component
+ * FIX 1: Only counts completed items
  */
 function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
     if (!container) return;
 
     const categories = {};
-    logs.forEach(log => {
+
+    // Filter ONLY COMPLETED logs for category statistics
+    const completedLogs = logs.filter(log => log.completed);
+
+    completedLogs.forEach(log => {
         if (!categories[log.category]) {
             categories[log.category] = { totalPractices: 0, topics: {} };
         }
@@ -303,7 +308,7 @@ function renderCategoryCards(logs) {
     });
 
     if (Object.keys(categories).length === 0) {
-        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No practice sessions logged in this period.</div>`;
+        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No completed practice sessions logged in this period.</div>`;
         return;
     }
 
@@ -324,11 +329,11 @@ function renderCategoryCards(logs) {
                 <div class="flex items-center justify-between">
                     <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider">${catName}</h3>
                     <span class="text-xs font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-lg">
-                        ${catData.totalPractices} session${catData.totalPractices > 1 ? 's' : ''}
+                        ${catData.totalPractices} completed
                     </span>
                 </div>
 
-                <details class="group">
+                <details class="group" open>
                     <summary class="text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer flex items-center justify-between font-semibold pt-1">
                         <span>Topic Breakdown (${Object.keys(catData.topics).length})</span>
                         <span class="transition-transform group-open:rotate-180">▾</span>
@@ -337,6 +342,64 @@ function renderCategoryCards(logs) {
                         ${topicsListMarkup}
                     </ul>
                 </details>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Calendar Day Detail Interaction
+ * FIX 2: Displays all practices and clearly marks completed ones with green accents
+ */
+function showDayDetails(dateStr, logs) {
+    const panel = document.getElementById('dayDetailsPanel');
+    const title = document.getElementById('selectedDateTitle');
+    const container = document.getElementById('dayPracticesList');
+
+    if (!panel || !title || !container) return;
+
+    title.innerText = dateStr;
+    panel.classList.remove('hidden');
+
+    if (logs.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 py-2">No practice sessions logged on this date.</p>`;
+        return;
+    }
+
+    container.innerHTML = logs.map(log => {
+        const isDone = Boolean(log.completed);
+        
+        // Dynamic border and badge styling
+        const cardBorder = isDone 
+            ? 'border-l-4 border-l-emerald-500 border-zinc-800 bg-zinc-900/90' 
+            : 'border-l-4 border-l-zinc-700 border-zinc-800/60 bg-zinc-900/40 opacity-75';
+
+        const badgeStyle = isDone 
+            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+            : 'bg-zinc-800 text-zinc-400 border-zinc-700';
+
+        const badgeLabel = isDone ? '✓ Completed' : 'Pending';
+
+        return `
+            <div class="flex items-center justify-between border rounded-xl px-4 py-3 ${cardBorder}">
+                <div class="space-y-1">
+                    <div class="text-xs font-bold ${isDone ? 'text-amber-400' : 'text-zinc-300'} flex items-center gap-2">
+                        <span>${log.topic}</span>
+                        <span class="text-[10px] text-zinc-500 font-normal">(${log.instrument})</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-md font-bold border ${badgeStyle}">
+                            ${badgeLabel}
+                        </span>
+                    </div>
+                    <div class="text-[10px] text-zinc-400">
+                        ${log.category} ${log.key ? `• ${log.key}${log.mode || ''}` : ''}
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs font-mono font-bold ${isDone ? 'text-emerald-400' : 'text-zinc-500'}">
+                        ${log.minutes} mins
+                    </div>
+                    ${log.bpm ? `<div class="text-[10px] font-mono text-amber-500/80">${log.bpm} BPM</div>` : ''}
+                </div>
             </div>
         `;
     }).join('');
@@ -401,36 +464,4 @@ function renderCalendarGrid() {
         dayCell.addEventListener('click', () => showDayDetails(dateStr, dayLogs));
         grid.appendChild(dayCell);
     }
-}
-
-function showDayDetails(dateStr, logs) {
-    const panel = document.getElementById('dayDetailsPanel');
-    const title = document.getElementById('selectedDateTitle');
-    const container = document.getElementById('dayPracticesList');
-
-    if (!panel || !title || !container) return;
-
-    title.innerText = dateStr;
-    panel.classList.remove('hidden');
-
-    if (logs.length === 0) {
-        container.innerHTML = `<p class="text-xs text-zinc-500">No practice sessions logged on this date.</p>`;
-        return;
-    }
-
-    container.innerHTML = logs.map(log => `
-        <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5">
-            <div>
-                <div class="text-xs font-bold text-amber-400 flex items-center gap-2">
-                    ${log.topic}
-                    <span class="text-[10px] text-zinc-500 font-normal">(${log.instrument})</span>
-                </div>
-                <div class="text-[10px] text-zinc-400">${log.category} ${log.key ? `• ${log.key}${log.mode || ''}` : ''}</div>
-            </div>
-            <div class="text-right">
-                <div class="text-xs font-mono font-bold text-zinc-200">${log.minutes} mins</div>
-                ${log.bpm ? `<div class="text-[10px] font-mono text-amber-500">${log.bpm} BPM</div>` : ''}
-            </div>
-        </div>
-    `).join('');
 }
