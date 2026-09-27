@@ -22,8 +22,15 @@ let timerInterval = null;
 let elapsedSeconds = 0;
 
 function getLogicalDateString(dateObj = new Date()) {
-    const adjusted = new Date(dateObj.getTime() - (4 * 60 * 60 * 1000));
-    return adjusted.toISOString().split('T')[0];
+    // 1. Create a copy of local time shifted back by 4 hours
+    const adjustedDate = new Date(dateObj.getTime() - (4 * 60 * 60 * 1000));
+    
+    // 2. Extract LOCAL year, month, and day instead of UTC values
+    const year = adjustedDate.getFullYear();
+    const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(adjustedDate.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
 }
 
 export async function initPage() {
