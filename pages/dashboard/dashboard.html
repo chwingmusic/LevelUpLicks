@@ -1,62 +1,122 @@
-<div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800/80 pb-4 gap-4">
+<div class="p-6 space-y-8 max-w-7xl mx-auto text-zinc-100">
+    <!-- Header Section -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
         <div>
-            <h2 class="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">Musician Dashboard</h2>
-            <p class="text-xs sm:text-sm text-zinc-400">Track practice consistency, velocity acceleration, and mastery metrics.</p>
+            <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                🎸 Musician Dashboard
+            </h1>
+            <p class="text-xs text-zinc-400 mt-1">Track consistency, volume, and category breakdowns.</p>
         </div>
-        <button id="btnQuickStartPractice" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center space-x-2">
-            <span>🎸</span> <span>Start Today's Session</span>
+        
+        <!-- Redirect to Practice Page -->
+        <button id="btnStartTodaySession" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 self-start md:self-auto cursor-pointer">
+            <span>🚀</span> Start Today's Session
         </button>
     </div>
 
-    <!-- STATS OVERVIEW CARDS -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl relative overflow-hidden">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Active Practice Streak</div>
-            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">14 <span class="text-amber-400 text-lg">Days 🔥</span></div>
-            <p class="text-[11px] text-zinc-400 mt-2">Personal record: 21 days</p>
+    <!-- Period Picker & Global Filters -->
+    <div class="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">📅 Time Period:</span>
+            <select id="presetPeriodSelect" class="bg-zinc-950 border border-zinc-700 text-zinc-200 text-xs rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-amber-500">
+                <option value="this_week">This Week</option>
+                <option value="last_week">Last Week</option>
+                <option value="this_month" selected>This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="ytd">Year to Date (YTD)</option>
+                <option value="last_year">Last Year</option>
+                <option value="custom">Custom Range</option>
+            </select>
         </div>
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Total Hours Logged</div>
-            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">48.5 <span class="text-zinc-500 text-xs">hrs</span></div>
-            <p class="text-[11px] text-emerald-400 mt-2">↑ +4.2 hrs this week</p>
-        </div>
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Max Speed Reached</div>
-            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">175 <span class="text-amber-400 text-xs">BPM</span></div>
-            <p class="text-[11px] text-zinc-400 mt-2">16th note Arpeggios</p>
-        </div>
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-2xl">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-500/80">Mastered Topics</div>
-            <div class="text-3xl font-['Space_Grotesk'] font-bold text-white mt-1">12 / 16</div>
-            <p class="text-[11px] text-amber-400 mt-2">75% Completion Rate</p>
+
+        <!-- Custom Date Range Inputs (Hidden unless "Custom" is selected) -->
+        <div id="customDateRange" class="hidden flex items-center gap-2">
+            <input type="date" id="startDatePicker" class="bg-zinc-950 border border-zinc-700 text-zinc-300 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-amber-500">
+            <span class="text-zinc-500 text-xs">to</span>
+            <input type="date" id="endDatePicker" class="bg-zinc-950 border border-zinc-700 text-zinc-300 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-amber-500">
         </div>
     </div>
 
-    <!-- HEATMAP & ACCELERATION CHART -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
-            <h3 class="text-base font-bold text-zinc-200">30-Day Practice Consistency Heatmap</h3>
-            <div class="grid grid-cols-10 gap-2 pt-2" id="dashboardHeatmap">
-                <!-- Heatmap generated via JS -->
+    <!-- Core Metric Cards (Streamlined) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Streak Card -->
+        <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 flex flex-col justify-between">
+            <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Active Practice Streak</div>
+            <div class="flex items-baseline gap-2 my-2">
+                <span id="statActiveStreak" class="text-4xl font-black text-amber-400">14</span>
+                <span class="text-lg font-bold text-amber-500">Days 🔥</span>
             </div>
-            <div class="flex items-center justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/60">
-                <span>Less active</span>
-                <div class="flex items-center space-x-1">
-                    <span class="w-2.5 h-2.5 rounded bg-zinc-800"></span>
-                    <span class="w-2.5 h-2.5 rounded bg-amber-900/50"></span>
-                    <span class="w-2.5 h-2.5 rounded bg-amber-600/80"></span>
-                    <span class="w-2.5 h-2.5 rounded bg-amber-400"></span>
-                </div>
-                <span>Peak Shred</span>
+            <div class="text-[11px] text-zinc-500">Personal record: <span id="statMaxStreak">21</span> days</div>
+        </div>
+
+        <!-- Hours Logged Card -->
+        <div class="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 flex flex-col justify-between">
+            <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Total Time Logged</div>
+            <div class="flex items-baseline gap-2 my-2">
+                <span id="statTotalHours" class="text-4xl font-black text-amber-400">48.5</span>
+                <span class="text-sm font-bold text-zinc-400">hrs</span>
+            </div>
+            <div id="statTimeChange" class="text-[11px] text-emerald-400 font-medium">↑ filtered period count</div>
+        </div>
+    </div>
+
+    <!-- Category Practice Breakdown Cards -->
+    <div class="space-y-3">
+        <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">Practice Category Breakdown</h2>
+        <div id="categoryCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Dynamic Category Cards rendered here -->
+        </div>
+    </div>
+
+    <!-- Calendar Month Heatmap Section -->
+    <div class="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-amber-400 flex items-center gap-2">
+                    🗓️ Practice Consistency Calendar
+                </h3>
+                <p class="text-xs text-zinc-400">Select any day to view logged practices below.</p>
+            </div>
+            <!-- Calendar Navigation -->
+            <div class="flex items-center gap-2">
+                <button id="btnPrevMonth" class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300">← Prev</button>
+                <span id="calendarMonthLabel" class="text-xs font-extrabold text-amber-400 min-w-[100px] text-center">-- ----</span>
+                <button id="btnNextMonth" class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300">Next →</button>
             </div>
         </div>
 
-        <div class="bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl space-y-4">
-            <h3 class="text-base font-bold text-zinc-200">Active Focus Topics</h3>
-            <div class="space-y-3" id="activeTopicsSummary">
-                <!-- Populated via JS -->
-            </div>
+        <!-- Calendar Grid Header (Days of week) -->
+        <div class="grid grid-cols-7 gap-2 text-center text-[10px] font-bold text-zinc-500 uppercase">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+
+        <!-- 35/42 Grid Cells for Full Month View -->
+        <div id="calendarGrid" class="grid grid-cols-7 gap-2">
+            <!-- Dynamic calendar day cells -->
+        </div>
+
+        <!-- Heatmap Intensity Legend -->
+        <div class="flex items-center justify-end gap-2 text-[10px] text-zinc-500 pt-2 border-t border-zinc-800/60">
+            <span>Less active</span>
+            <span class="w-3 h-3 rounded bg-zinc-800 inline-block"></span>
+            <span class="w-3 h-3 rounded bg-amber-900 inline-block"></span>
+            <span class="w-3 h-3 rounded bg-amber-700 inline-block"></span>
+            <span class="w-3 h-3 rounded bg-amber-500 inline-block"></span>
+            <span class="w-3 h-3 rounded bg-yellow-400 inline-block"></span>
+            <span>Peak shred</span>
+        </div>
+    </div>
+
+    <!-- Collapsible Day Details Panel (Expands when date clicked) -->
+    <div id="dayDetailsPanel" class="hidden bg-zinc-950 border border-amber-500/30 rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <h4 class="text-xs font-bold text-amber-400 flex items-center gap-2 uppercase tracking-wider">
+                📝 Practices Logged for <span id="selectedDateTitle" class="text-white">--</span>
+            </h4>
+            <button id="btnCloseDayDetails" class="text-zinc-500 hover:text-zinc-300 text-xs font-bold">✕ Close</button>
+        </div>
+        <div id="dayPracticesList" class="space-y-2">
+            <!-- Logged practice items render here -->
         </div>
     </div>
 </div>
