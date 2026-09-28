@@ -20,6 +20,7 @@ let isMetronomePlaying = false;
 let isTimerRunning = false;
 let timerInterval = null;
 let elapsedSeconds = 0;
+let currentActiveFeatures = []; // Track active feature instances for cleanup
 
 function getLogicalDateString(dateObj = new Date()) {
     // 1. Create a copy of local time shifted back by 4 hours
@@ -72,10 +73,7 @@ async function setupInstrumentOptions() {
     let detectedInstruments = [];
 
     try {
-        // 1. Fetch all topics from the user's catalog
         const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
-        
-        // 2. Extract unique instrument values across all topic entries
         const instrumentSet = new Set();
         snap.docs.forEach(docSnap => {
             const data = docSnap.data();
@@ -89,18 +87,13 @@ async function setupInstrumentOptions() {
         console.error("Error detecting instruments from topic catalog:", e);
     }
 
-    // 3. Fallback default if no topics exist yet
     if (detectedInstruments.length === 0) {
         detectedInstruments = ["Electric Guitar"];
     }
 
-    // 4. Render only the detected instruments in the selector
     instSelect.innerHTML = detectedInstruments.map(inst => `<option value="${inst}">${inst}</option>`).join('');
-    
-    // 5. Default to the first detected instrument
     currentInstrument = instSelect.value;
 
-    // 6. Reload practice deck when switching instrument
     instSelect.addEventListener('change', async () => {
         currentInstrument = instSelect.value;
         await loadDailySession();
@@ -147,7 +140,6 @@ function setupEventListeners() {
     document.getElementById('focusTimeSigSelect').addEventListener('change', updateMetronomePulseLabel);
     document.getElementById('btnToggleMetronome').addEventListener('click', toggleMetronome);
 
-    // Simplified Stopwatch Toggle & Reset
     document.getElementById('btnToggleTimer').addEventListener('click', toggleTimer);
     document.getElementById('btnResetTimer').addEventListener('click', resetTimer);
 }
@@ -218,7 +210,6 @@ function updateDailyStats() {
 async function generateRandomRoutine() {
     const dbToUse = personalDb || gatewayDb;
     const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
-    // Filter catalog by instrument AND require the "Daily Routine" tag
     const catalog = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(t => (!t.instrument || t.instrument === currentInstrument) && t.tag === 'Daily Routine');
@@ -322,7 +313,35 @@ window.addSingleTopicToSession = async (topicId) => {
     await loadDailySession();
 };
 
-// Open Practice Workspace Modal FIXED (Added 'async')
+// Global helper function for opening Base64 files in a new tab
+window.openBase64File = function(dataUrl) {
+    if (!dataUrl) return;
+    
+    try {
+        const parts = dataUrl.split(';base64,');
+        const contentType = parts[0].replace('data:', '') || 'application/pdf';
+        const byteCharacters = atob(parts[1]);
+        
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+            alert('Please allow pop-ups for this website to view attachments.');
+        }
+    } catch (e) {
+        console.error('Error opening Base64 attachment:', e);
+        alert('Failed to preview attachment.');
+    }
+};
+
+// Open Practice Workspace Modal
 window.openFocusModal = async (cardId) => {
     activeCardEditing = activeSessionItems.find(x => x.id === cardId);
     if (!activeCardEditing) return;
@@ -344,31 +363,45 @@ window.openFocusModal = async (cardId) => {
     document.getElementById('focusDurationMins').value = activeCardEditing.durationMins || '';
     document.getElementById('focusSessionNotes').value = activeCardEditing.sessionNotes || activeCardEditing.notes || '';
 
-    // Render Attachments
+    // Render Resources & Attachments properly
     const resContainer = document.getElementById('focusResourcesContainer');
     resContainer.innerHTML = `
-        ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
+        ${activeCardEditing.resourceUrl ? `<p class="mb-2">🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
         ${activeCardEditing.attachments && activeCardEditing.attachments.length > 0 ? `
             <div class="space-y-1">
                 <strong>Attachments:</strong>
-                <div class="flex flex-wrap gap-2">
-                    ${activeCardEditing.attachments.map((a, index) => {
-                        // Check if attachment is a Data URL or regular HTTPS URL
-                        if (a.data && a.data.startsWith('data:')) {
-                            return `<button type="button" onclick="openBase64File(activeCardEditing.attachments[${index}].data)" class="bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px] cursor-pointer">📄 ${a.name}</button>`;
-                        } else {
-                            return `<a href="${a.data}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px]">📄 ${a.name}</a>`;
-                        }
-                    }).join('')}
-                </div>
+                <div class="flex flex-wrap gap-2" id="attachmentButtonsList"></div>
             </div>
         ` : ''}
     `;
 
-    updateMetronomePulseLabel();
-    resetTimer(); // Timer initialized at 00:00 without auto-starting
+    // Safely attach event listeners to avoid Base64 string escaping errors
+    if (activeCardEditing.attachments && activeCardEditing.attachments.length > 0) {
+        const listContainer = document.getElementById('attachmentButtonsList');
+        if (listContainer) {
+            activeCardEditing.attachments.forEach(a => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px] cursor-pointer flex items-center gap-1';
+                btn.innerHTML = `📄 ${a.name}`;
+                
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (a.data && a.data.startsWith('data:')) {
+                        window.openBase64File(a.data);
+                    } else {
+                        window.open(a.data, '_blank', 'noopener,noreferrer');
+                    }
+                });
 
-    // Inject active instrument plugin feature
+                listContainer.appendChild(btn);
+            });
+        }
+    }
+
+    updateMetronomePulseLabel();
+    resetTimer();
+
     await loadInstrumentFeatures(currentInstrument, activeCardEditing.tag);
 
     document.getElementById('focusPracticeModal').classList.remove('hidden');
@@ -395,10 +428,7 @@ async function deleteCurrentFocusCard() {
     const cardPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items/${activeCardEditing.id}`;
 
     try {
-        // Delete document from Firestore
         await deleteDoc(doc(dbToUse, cardPath));
-        
-        // Close modal and refresh daily deck
         closeFocusModal();
         await loadDailySession();
     } catch (err) {
@@ -433,7 +463,6 @@ async function saveFocusCard(isCompleted) {
     await loadDailySession();
 }
 
-// Time Signature & Metronome Pulse Logic
 function updateMetronomePulseLabel() {
     const sig = document.getElementById('focusTimeSigSelect').value;
     const label = document.getElementById('metroPulseNoteType');
@@ -469,15 +498,7 @@ function startMetronome() {
         const bpm = parseInt(document.getElementById('metroBpmSlider').value) || 120;
         const timeSig = document.getElementById('focusTimeSigSelect').value;
 
-        // Interval calculation based on meter
-        let intervalMs;
-        if (timeSig === '6/8' || timeSig === '12/8') {
-            // Compound meter: BPM represents dotted quarter notes
-            intervalMs = (60 / bpm) * 1000;
-        } else {
-            // Simple meter: BPM represents quarter notes
-            intervalMs = (60 / bpm) * 1000;
-        }
+        let intervalMs = (60 / bpm) * 1000;
 
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -492,10 +513,12 @@ function startMetronome() {
         osc.stop(audioCtx.currentTime + 0.05);
 
         const indicator = document.getElementById('metroBeatIndicator');
-        indicator.className = "h-3 w-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/50";
-        setTimeout(() => {
-            indicator.className = "h-3 w-3 rounded-full bg-zinc-700 transition-all";
-        }, 100);
+        if (indicator) {
+            indicator.className = "h-3 w-3 rounded-full bg-amber-400 shadow-md shadow-amber-400/50";
+            setTimeout(() => {
+                indicator.className = "h-3 w-3 rounded-full bg-zinc-700 transition-all";
+            }, 100);
+        }
 
         metronomeInterval = setTimeout(playPulse, intervalMs);
     };
@@ -513,7 +536,6 @@ function stopMetronome() {
     }
 }
 
-// Stopwatch Control Logic
 function toggleTimer() {
     if (isTimerRunning) {
         stopTimer();
@@ -545,7 +567,6 @@ function stopTimer() {
         btn.className = "flex-1 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs hover:bg-emerald-500/30";
     }
 
-    // Auto-update duration spent upon stopping/pausing stopwatch
     if (elapsedSeconds > 0) {
         const computedMins = Math.ceil(elapsedSeconds / 60);
         document.getElementById('focusDurationMins').value = computedMins;
@@ -561,16 +582,14 @@ function resetTimer() {
 function updateTimerDisplay() {
     const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
     const secs = String(elapsedSeconds % 60).padStart(2, '0');
-    document.getElementById('focusTimerDisplay').innerText = `${mins}:${secs}`;
+    const display = document.getElementById('focusTimerDisplay');
+    if (display) display.innerText = `${mins}:${secs}`;
 }
-
-let currentActiveFeatures = []; // Track active feature instances for cleanup
 
 async function loadInstrumentFeatures(instrument, topicTag) {
     const container = document.getElementById('dynamicFeatureContainer');
     if (!container) return;
     
-    // 1. Clean up all running feature modules (stops mic stream & audio nodes)
     currentActiveFeatures.forEach(feature => {
         if (feature && typeof feature.destroy === 'function') {
             feature.destroy();
@@ -579,14 +598,11 @@ async function loadInstrumentFeatures(instrument, topicTag) {
     currentActiveFeatures = [];
     container.innerHTML = ''; 
 
-    // Normalize strings for matching
     const normInst = (instrument || '').trim().toLowerCase();
     const normTag = (topicTag || '').trim().toLowerCase();
 
     try {
-        // --- VOCALS: Load BOTH Pitch Pipe AND Live Pitch Detector Graph ---
         if (['vocals', 'vocal', 'voice', 'singing'].includes(normInst)) {
-            // Create two dedicated wrapper slots
             const pitchPipeSlot = document.createElement('div');
             pitchPipeSlot.className = 'mb-4';
             const pitchGraphSlot = document.createElement('div');
@@ -594,7 +610,6 @@ async function loadInstrumentFeatures(instrument, topicTag) {
             container.appendChild(pitchPipeSlot);
             container.appendChild(pitchGraphSlot);
 
-            // Import both features concurrently
             const [{ PitchPipeFeature }, { PitchGraphFeature }] = await Promise.all([
                 import('../../features/pitchPipe.js'),
                 import('../../features/pitchGraph.js')
@@ -608,7 +623,6 @@ async function loadInstrumentFeatures(instrument, topicTag) {
 
             currentActiveFeatures.push(pitchPipeInstance, pitchGraphInstance);
 
-        // --- GUITARS: Load Tuner Feature ---
         } else if (['electric guitar', 'acoustic guitar', 'bass guitar', 'guitar', 'bass'].includes(normInst)) {
             const { GuitarTunerFeature } = await import('../../features/guitarTuner.js');
             const tunerInstance = new GuitarTunerFeature(container);
@@ -616,7 +630,6 @@ async function loadInstrumentFeatures(instrument, topicTag) {
             
             currentActiveFeatures.push(tunerInstance);
 
-        // --- OTHER / SPECIFIC TAGS ---
         } else if (normTag === 'scale pitch analysis') {
             const { PitchGraphFeature } = await import('../../features/pitchGraph.js');
             const graphInstance = new PitchGraphFeature(container);
@@ -627,69 +640,4 @@ async function loadInstrumentFeatures(instrument, topicTag) {
     } catch (err) {
         console.error("Failed to load instrument features:", err);
     }
-}
-
-// Global helper function for opening Base64 files in a new tab
-window.openBase64File = function(dataUrl) {
-    if (!dataUrl) return;
-    
-    try {
-        // Separate base64 header from content bytes
-        const parts = dataUrl.split(';base64,');
-        const contentType = parts[0].replace('data:', '') || 'application/pdf';
-        const byteCharacters = atob(parts[1]);
-        
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: contentType });
-        const blobUrl = URL.createObjectURL(blob);
-        
-        // Open the Blob URL in a new tab
-        const win = window.open(blobUrl, '_blank');
-        if (!win) {
-            alert('Please allow pop-ups for this website to view attachments.');
-        }
-    } catch (e) {
-        console.error('Error opening Base64 attachment:', e);
-        alert('Failed to preview attachment.');
-    }
-};
-
-// Render Attachments
-const resContainer = document.getElementById('focusResourcesContainer');
-resContainer.innerHTML = `
-    ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
-    ${activeCardEditing.attachments && activeCardEditing.attachments.length > 0 ? `
-        <div class="space-y-1">
-            <strong>Attachments:</strong>
-            <div class="flex flex-wrap gap-2" id="attachmentButtonsList"></div>
-        </div>
-    ` : ''}
-`;
-
-// Dynamically attach click events to avoid scope/quoting issues with Base64 data
-if (activeCardEditing.attachments && activeCardEditing.attachments.length > 0) {
-    const listContainer = document.getElementById('attachmentButtonsList');
-    
-    activeCardEditing.attachments.forEach(a => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px] cursor-pointer flex items-center gap-1';
-        btn.innerHTML = `📄 ${a.name}`;
-        
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (a.data && a.data.startsWith('data:')) {
-                window.openBase64File(a.data);
-            } else {
-                window.open(a.data, '_blank', 'noopener,noreferrer');
-            }
-        });
-
-        listContainer.appendChild(btn);
-    });
 }
