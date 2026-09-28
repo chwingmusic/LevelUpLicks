@@ -13,6 +13,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <!-- OPTION 3 FAVICON (SVG Data URI) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2318181b'/><path d='M30 46 L50 28 L70 46 M30 68 L50 50 L70 68' stroke='%23f59e0b' stroke-width='10' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='16' cy='38' r='6' fill='%2371717a'/><circle cx='84' cy='38' r='6' fill='%2371717a'/><circle cx='16' cy='60' r='6' fill='%2371717a'/><circle cx='84' cy='60' r='6' fill='%2371717a'/></svg>" type="image/svg+xml">
 </head>
 <body class="bg-zinc-950 text-zinc-100 font-['Plus_Jakarta_Sans'] min-h-screen flex flex-col md:flex-row m-0 p-0 antialiased">
 
@@ -34,7 +36,19 @@
     <aside class="w-full md:w-64 bg-zinc-900/60 backdrop-blur-xl border-b md:border-b-0 md:border-r border-zinc-800/80 flex flex-col justify-between shrink-0">
         <div class="p-6">
             <div class="flex items-center space-x-3 mb-8">
-                <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-['Space_Grotesk'] font-bold text-zinc-950 shadow-md shadow-amber-500/10">L</div>
+                <!--<div class="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-['Space_Grotesk'] font-bold text-zinc-950 shadow-md shadow-amber-500/10">L</div>-->
+                <!-- Logo Icon (Option 3 SVG) -->
+                <svg class="w-8 h-8 rounded-xl shrink-0 shadow-md" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" rx="22" fill="#18181b"/>
+                    <!-- Double Level-Up Chevrons -->
+                    <path d="M30 46 L50 28 L70 46" stroke="#f59e0b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M30 68 L50 50 L70 68" stroke="#f59e0b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <!-- 2+2 Bass Peghead Tuners -->
+                    <circle cx="16" cy="38" r="6" fill="#71717a"/>
+                    <circle cx="84" cy="38" r="6" fill="#71717a"/>
+                    <circle cx="16" cy="60" r="6" fill="#71717a"/>
+                    <circle cx="84" cy="60" r="6" fill="#71717a"/>
+                </svg>
                 <h1 class="text-lg font-['Space_Grotesk'] font-bold tracking-tight text-white">LevelUpLicks</h1>
             </div>
             <nav class="space-y-1.5">
