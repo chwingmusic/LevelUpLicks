@@ -219,7 +219,16 @@ async function generateRandomRoutine() {
         return;
     }
 
-    const count = parseInt(prompt("How many practice topics would you like to generate?", "5")) || 5;
+    // 1. Prompt user for count input
+    const userInput = prompt("How many practice topics would you like to generate?", "5");
+
+    // 2. Early return if the user clicks "Cancel" or closes the dialog
+    if (userInput === null) {
+        return;
+    }
+
+    // 3. Parse user input with fallback default
+    const count = parseInt(userInput, 10) || 5;
     const sessionPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items`;
 
     for (let i = 0; i < count; i++) {
