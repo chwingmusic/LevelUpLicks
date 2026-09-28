@@ -629,34 +629,67 @@ async function loadInstrumentFeatures(instrument, topicTag) {
     }
 }
 
-/**
- * Opens Base64 data URLs safely in a new browser tab using Blob URLs
- */
-window.openBase64File = function(base64Data) {
+// Global helper function for opening Base64 files in a new tab
+window.openBase64File = function(dataUrl) {
+    if (!dataUrl) return;
+    
     try {
-        // Extract content type and base64 string
-        const parts = base64Data.split(';base64,');
+        // Separate base64 header from content bytes
+        const parts = dataUrl.split(';base64,');
         const contentType = parts[0].replace('data:', '') || 'application/pdf';
         const byteCharacters = atob(parts[1]);
         
-        // Convert base64 bytes to Blob
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
+        
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: contentType });
-
-        // Create blob URL and open in new tab
         const blobUrl = URL.createObjectURL(blob);
-        const newWindow = window.open(blobUrl, '_blank');
-
-        // Optional: Clean up memory after window loads
-        if (!newWindow) {
-            alert("Please allow pop-ups for this website to view attachments.");
+        
+        // Open the Blob URL in a new tab
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+            alert('Please allow pop-ups for this website to view attachments.');
         }
     } catch (e) {
-        console.error("Error opening file:", e);
-        alert("Unable to open file attachment.");
+        console.error('Error opening Base64 attachment:', e);
+        alert('Failed to preview attachment.');
     }
 };
+
+// Render Attachments
+const resContainer = document.getElementById('focusResourcesContainer');
+resContainer.innerHTML = `
+    ${activeCardEditing.resourceUrl ? `<p>🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
+    ${activeCardEditing.attachments && activeCardEditing.attachments.length > 0 ? `
+        <div class="space-y-1">
+            <strong>Attachments:</strong>
+            <div class="flex flex-wrap gap-2" id="attachmentButtonsList"></div>
+        </div>
+    ` : ''}
+`;
+
+// Dynamically attach click events to avoid scope/quoting issues with Base64 data
+if (activeCardEditing.attachments && activeCardEditing.attachments.length > 0) {
+    const listContainer = document.getElementById('attachmentButtonsList');
+    
+    activeCardEditing.attachments.forEach(a => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px] cursor-pointer flex items-center gap-1';
+        btn.innerHTML = `📄 ${a.name}`;
+        
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (a.data && a.data.startsWith('data:')) {
+                window.openBase64File(a.data);
+            } else {
+                window.open(a.data, '_blank', 'noopener,noreferrer');
+            }
+        });
+
+        listContainer.appendChild(btn);
+    });
+}
