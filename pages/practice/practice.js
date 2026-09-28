@@ -352,7 +352,14 @@ window.openFocusModal = async (cardId) => {
             <div class="space-y-1">
                 <strong>Attachments:</strong>
                 <div class="flex flex-wrap gap-2">
-                    ${activeCardEditing.attachments.map(a => `<a href="${a.data}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px]">📄 ${a.name}</a>`).join('')}
+                    ${activeCardEditing.attachments.map((a, index) => {
+                        // Check if attachment is a Data URL or regular HTTPS URL
+                        if (a.data && a.data.startsWith('data:')) {
+                            return `<button type="button" onclick="openBase64File(activeCardEditing.attachments[${index}].data)" class="bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px] cursor-pointer">📄 ${a.name}</button>`;
+                        } else {
+                            return `<a href="${a.data}" target="_blank" rel="noopener noreferrer" class="bg-zinc-800 text-amber-300 border border-zinc-700 px-2 py-1 rounded text-[10px]">📄 ${a.name}</a>`;
+                        }
+                    }).join('')}
                 </div>
             </div>
         ` : ''}
@@ -621,3 +628,35 @@ async function loadInstrumentFeatures(instrument, topicTag) {
         console.error("Failed to load instrument features:", err);
     }
 }
+
+/**
+ * Opens Base64 data URLs safely in a new browser tab using Blob URLs
+ */
+window.openBase64File = function(base64Data) {
+    try {
+        // Extract content type and base64 string
+        const parts = base64Data.split(';base64,');
+        const contentType = parts[0].replace('data:', '') || 'application/pdf';
+        const byteCharacters = atob(parts[1]);
+        
+        // Convert base64 bytes to Blob
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: contentType });
+
+        // Create blob URL and open in new tab
+        const blobUrl = URL.createObjectURL(blob);
+        const newWindow = window.open(blobUrl, '_blank');
+
+        // Optional: Clean up memory after window loads
+        if (!newWindow) {
+            alert("Please allow pop-ups for this website to view attachments.");
+        }
+    } catch (e) {
+        console.error("Error opening file:", e);
+        alert("Unable to open file attachment.");
+    }
+};
