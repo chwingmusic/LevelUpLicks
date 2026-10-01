@@ -67,26 +67,40 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <!-- 5. Key -->
+                <!-- Inside songlist.html: Grid with Key, Mode, Time Sig, and Target BPM -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <!-- Key -->
                     <div>
                         <label class="block text-xs font-semibold text-zinc-400 mb-1">Key</label>
                         <select id="songKeySelect" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"></select>
                     </div>
-
-                    <!-- 5. Mode -->
+                
+                    <!-- Mode -->
                     <div>
                         <label class="block text-xs font-semibold text-zinc-400 mb-1">Mode</label>
                         <select id="songModeSelect" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500"></select>
                     </div>
-
-                    <!-- 6. Target BPM -->
+                
+                    <!-- Time Signature (NEW) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-400 mb-1">Time Sig</label>
+                        <select id="songTimeSigSelect" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
+                            <option value="4/4">4/4</option>
+                            <option value="3/4">3/4</option>
+                            <option value="6/8">6/8</option>
+                            <option value="12/8">12/8</option>
+                            <option value="5/4">5/4</option>
+                            <option value="7/8">7/8</option>
+                        </select>
+                    </div>
+                
+                    <!-- Target BPM -->
                     <div>
                         <label class="block text-xs font-semibold text-zinc-400 mb-1">Target BPM</label>
                         <input type="number" id="songTargetBpmInput" min="30" max="300" value="120" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
                     </div>
-
-                    <!-- 7. Mastered BPM (Edit Mode Only) -->
+                
+                    <!-- Mastered BPM (Edit Mode Only) -->
                     <div id="masteredBpmContainer" class="hidden">
                         <label class="block text-xs font-semibold text-zinc-400 mb-1">Mastered BPM</label>
                         <input type="number" id="songMasteredBpmInput" min="0" max="300" value="0" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
