@@ -29,6 +29,7 @@ export const gatewayDb = getFirestore(gatewayApp);
 const viewRoutes = {
     dashboard: { html: 'pages/dashboard/dashboard.html', js: 'pages/dashboard/dashboard.js' },
     practice: { html: 'pages/practice/practice.html', js: 'pages/practice/practice.js' },
+    songlist: { html: 'pages/songlist/songlist.html', js: 'pages/songlist/songlist.js' },
     configuration: { html: 'pages/configuration/config.html', js: 'pages/configuration/config.js' },
     tutorial: { html: 'pages/tutorial/tutorial.html', js: 'pages/tutorial/tutorial.js' }
 };
@@ -119,11 +120,9 @@ async function triggerMobileGoogleLogin() {
 
     // Initialize GIS Client
     google.accounts.id.initialize({
-        // Extract OAuth Client ID associated with your Firebase Web App
         client_id: "878018571238-0u5pld3i270v5i3v5103.apps.googleusercontent.com", 
         callback: async (response) => {
             try {
-                // Convert Google ID token directly into Firebase Auth Credential
                 const credential = GoogleAuthProvider.credential(response.credential);
                 await signInWithCredential(gatewayAuth, credential);
             } catch (err) {
@@ -132,17 +131,14 @@ async function triggerMobileGoogleLogin() {
         }
     });
 
-    // Prompt native prompt on mobile browsers without page redirects
     google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // Fallback to standard popup if prompt is dismissed/blocked
             const provider = new GoogleAuthProvider();
             signInWithPopup(gatewayAuth, provider);
         }
     });
 }
 
-// Function to detect in-app webviews (WhatsApp, Instagram, FB, Line, WeChat)
 function isInAppBrowser() {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     return /FBAN|FBAV|Instagram|WhatsApp|Line|MicroMessenger|LinkedInApp/i.test(ua);
@@ -151,20 +147,16 @@ function isInAppBrowser() {
 const btnLogin = document.getElementById('btnLogin');
 
 if (btnLogin) {
-    // Add touchstart listener alongside click for immediate mobile response
     const handleLogin = async (e) => {
         e.preventDefault();
         
-        // Prevent double triggers if both touchstart and click fire
         if (btnLogin.dataset.processing === "true") return;
         btnLogin.dataset.processing = "true";
 
-        // Show immediate visual loading state on mobile
         const originalText = btnLogin.innerText;
         btnLogin.innerText = "Connecting...";
         btnLogin.style.opacity = "0.6";
 
-        // Check for WebViews (WhatsApp / IG) where popups are blocked silently
         if (isInAppBrowser()) {
             alert("In-app browsers (like WhatsApp/Instagram) block Google login. Please tap the menu button (...) and select 'Open in Safari' or 'Open in Chrome'.");
             resetButton(originalText);
