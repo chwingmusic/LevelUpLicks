@@ -10,6 +10,7 @@ let personalDb = null;
 let currentSelectedDate = "";
 let currentInstrument = "";
 let activeCatalog = [];
+let activeSongCatalog = [];
 let activeSessionItems = [];
 let activeCardEditing = null;
 
@@ -23,14 +24,10 @@ let elapsedSeconds = 0;
 let currentActiveFeatures = []; // Track active feature instances for cleanup
 
 function getLogicalDateString(dateObj = new Date()) {
-    // 1. Create a copy of local time shifted back by 4 hours
     const adjustedDate = new Date(dateObj.getTime() - (4 * 60 * 60 * 1000));
-    
-    // 2. Extract LOCAL year, month, and day instead of UTC values
     const year = adjustedDate.getFullYear();
     const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
     const day = String(adjustedDate.getDate()).padStart(2, '0');
-    
     return `${year}-${month}-${day}`;
 }
 
@@ -69,7 +66,6 @@ async function getPersonalDatabaseInstance(user) {
 async function setupInstrumentOptions() {
     const instSelect = document.getElementById('practiceInstrumentSelect');
     const dbToUse = personalDb || gatewayDb;
-    
     let detectedInstruments = [];
 
     try {
@@ -106,10 +102,19 @@ function setupEventListeners() {
         await loadDailySession();
     });
 
+    // Topic & Song Modal Actions
     document.getElementById('btnAddTopicManual').addEventListener('click', openAddTopicModal);
     document.getElementById('btnCloseTopicModal').addEventListener('click', () => {
         document.getElementById('addTopicModal').classList.add('hidden');
     });
+
+    document.getElementById('btnAddSongManual').addEventListener('click', openAddSongModal);
+    document.getElementById('btnCloseSongModal').addEventListener('click', () => {
+        document.getElementById('addSongModal').classList.add('hidden');
+    });
+    
+    // Live Song Filter Textbox Handler
+    document.getElementById('songSearchFilter').addEventListener('input', renderSongModalList);
 
     document.getElementById('btnGenerateRoutine').addEventListener('click', generateRandomRoutine);
     document.getElementById('btnClearRoutine').addEventListener('click', clearDailyRoutine);
@@ -174,8 +179,8 @@ function renderSessionDeck() {
     if (activeSessionItems.length === 0) {
         container.innerHTML = `
             <div class="col-span-full text-center py-12 border border-dashed border-zinc-800 rounded-3xl">
-                <p class="text-xs text-zinc-500">No topics scheduled for ${currentInstrument} on ${currentSelectedDate}.</p>
-                <p class="text-xs text-amber-500/80 mt-1">Click "Add Topic" or "Auto-Generate Routine" to start!</p>
+                <p class="text-xs text-zinc-500">No items scheduled for ${currentInstrument} on ${currentSelectedDate}.</p>
+                <p class="text-xs text-amber-500/80 mt-1">Click "Add Topic", "Add Song", or "Auto-Generate Routine" to start!</p>
             </div>
         `;
         return;
@@ -185,7 +190,7 @@ function renderSessionDeck() {
         <div onclick="openFocusModal('${item.id}')" class="cursor-pointer bg-zinc-900/70 hover:bg-zinc-900 border ${item.completed ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-zinc-800/80'} rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all hover:border-zinc-700">
             <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded ${item.completed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${item.tag || 'Routine'}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded ${item.completed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : item.isSong ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${item.tag || 'Routine'}</span>
                     <span class="text-xs font-semibold ${item.completed ? 'text-emerald-400' : 'text-zinc-500'}">${item.completed ? '✅ Done' : '⏳ Pending'}</span>
                 </div>
                 <h4 class="text-sm font-bold text-white tracking-tight leading-snug">${formatCardTitle(item)}</h4>
@@ -219,15 +224,9 @@ async function generateRandomRoutine() {
         return;
     }
 
-    // 1. Prompt user for count input
     const userInput = prompt("How many practice topics would you like to generate?", "5");
+    if (userInput === null) return;
 
-    // 2. Early return if the user clicks "Cancel" or closes the dialog
-    if (userInput === null) {
-        return;
-    }
-
-    // 3. Parse user input with fallback default
     const count = parseInt(userInput, 10) || 5;
     const sessionPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items`;
 
@@ -252,6 +251,7 @@ async function generateRandomRoutine() {
             attachments: randomTopic.attachments || [],
             completed: false,
             durationMins: 0,
+            isSong: false,
             createdAt: new Date().toISOString()
         };
 
@@ -272,6 +272,9 @@ async function clearDailyRoutine() {
     await loadDailySession();
 }
 
+// --------------------------------------------------------------------------
+// TOPIC MODAL LOGIC
+// --------------------------------------------------------------------------
 async function openAddTopicModal() {
     const dbToUse = personalDb || gatewayDb;
     const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/topics`));
@@ -314,11 +317,85 @@ window.addSingleTopicToSession = async (topicId) => {
         attachments: t.attachments || [],
         completed: false,
         durationMins: 0,
+        isSong: false,
         createdAt: new Date().toISOString()
     };
 
     await setDoc(doc(collection(dbToUse, sessionPath)), itemPayload);
     document.getElementById('addTopicModal').classList.add('hidden');
+    await loadDailySession();
+};
+
+// --------------------------------------------------------------------------
+// SONG MODAL LOGIC (NEW)
+// --------------------------------------------------------------------------
+async function openAddSongModal() {
+    const dbToUse = personalDb || gatewayDb;
+    const snap = await getDocs(collection(dbToUse, `users/${activeUser.uid}/songs`));
+    activeSongCatalog = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(s => !s.instrument || s.instrument === currentInstrument);
+
+    document.getElementById('songSearchFilter').value = '';
+    renderSongModalList();
+    document.getElementById('addSongModal').classList.remove('hidden');
+}
+
+function renderSongModalList() {
+    const listContainer = document.getElementById('songSelectionList');
+    const filterText = document.getElementById('songSearchFilter').value.trim().toLowerCase();
+
+    const filtered = activeSongCatalog.filter(s => 
+        s.title.toLowerCase().includes(filterText) || 
+        (s.key && s.key.toLowerCase().includes(filterText)) ||
+        (s.mode && s.mode.toLowerCase().includes(filterText))
+    );
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `<p class="text-xs text-zinc-500 py-4 text-center">No matching songs found in your repertoire.</p>`;
+        return;
+    }
+
+    listContainer.innerHTML = filtered.map(s => `
+        <div onclick="addSingleSongToSession('${s.id}')" class="cursor-pointer bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 p-3 rounded-xl flex items-center justify-between transition-colors">
+            <div>
+                <h5 class="text-xs font-bold text-white">${s.title}</h5>
+                <p class="text-[10px] text-zinc-400">Key: ${s.key || 'N/A'} ${s.mode && s.mode !== '(None)' ? s.mode : ''} • Target: ${s.targetBpm || 120} BPM</p>
+            </div>
+            <span class="text-xs text-amber-400 font-bold">+ Add Song</span>
+        </div>
+    `).join('');
+}
+
+window.addSingleSongToSession = async (songId) => {
+    const s = activeSongCatalog.find(x => x.id === songId);
+    if (!s) return;
+
+    const dbToUse = personalDb || gatewayDb;
+    const sessionPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items`;
+
+    const itemPayload = {
+        songId: s.id,
+        title: s.title,
+        category: 'Song Repertoire',
+        subCategory: s.instrument || 'General',
+        tag: 'Song Practice',
+        key: s.key || '(None)',
+        mode: s.mode || '(None)',
+        timeSignature: s.timeSignature || '4/4',
+        targetMinutes: 15,
+        targetBpm: s.targetBpm || 120,
+        resourceUrl: s.videoLink || '',
+        notes: '',
+        attachments: s.attachments || [],
+        completed: false,
+        durationMins: 0,
+        isSong: true,
+        createdAt: new Date().toISOString()
+    };
+
+    await setDoc(doc(collection(dbToUse, sessionPath)), itemPayload);
+    document.getElementById('addSongModal').classList.add('hidden');
     await loadDailySession();
 };
 
@@ -363,11 +440,12 @@ window.openFocusModal = async (cardId) => {
     fillSelectOptions('focusModeSelect', MODES_LIST, activeCardEditing.mode);
     fillSelectOptions('focusTimeSigSelect', ["4/4", "3/4", "6/8", "12/8", "5/4", "7/8"], activeCardEditing.timeSignature);
 
-    const initialBpm = activeCardEditing.targetBpm || 120;
+    // Auto-Set Metronome & Session BPM to Target BPM
+    const targetBpm = activeCardEditing.targetBpm || 120;
     document.getElementById('focusTargetMins').value = activeCardEditing.targetMinutes || 15;
-    document.getElementById('focusSingleBpm').value = initialBpm;
-    document.getElementById('metroBpmSlider').value = initialBpm;
-    document.getElementById('metroBpmDisplay').innerText = `${initialBpm} BPM`;
+    document.getElementById('focusSingleBpm').value = targetBpm;
+    document.getElementById('metroBpmSlider').value = targetBpm;
+    document.getElementById('metroBpmDisplay').innerText = `${targetBpm} BPM`;
 
     document.getElementById('focusDurationMins').value = activeCardEditing.durationMins || '';
     document.getElementById('focusSessionNotes').value = activeCardEditing.sessionNotes || activeCardEditing.notes || '';
@@ -375,7 +453,7 @@ window.openFocusModal = async (cardId) => {
     // Render Resources & Attachments properly
     const resContainer = document.getElementById('focusResourcesContainer');
     resContainer.innerHTML = `
-        ${activeCardEditing.resourceUrl ? `<p class="mb-2">🔗 <strong>URL:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
+        ${activeCardEditing.resourceUrl ? `<p class="mb-2">🔗 <strong>Link/Video:</strong> <a href="${activeCardEditing.resourceUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 underline">${activeCardEditing.resourceUrl}</a></p>` : ''}
         ${activeCardEditing.attachments && activeCardEditing.attachments.length > 0 ? `
             <div class="space-y-1">
                 <strong>Attachments:</strong>
@@ -384,7 +462,6 @@ window.openFocusModal = async (cardId) => {
         ` : ''}
     `;
 
-    // Safely attach event listeners to avoid Base64 string escaping errors
     if (activeCardEditing.attachments && activeCardEditing.attachments.length > 0) {
         const listContainer = document.getElementById('attachmentButtonsList');
         if (listContainer) {
@@ -450,13 +527,14 @@ async function saveFocusCard(isCompleted) {
     if (!activeCardEditing) return;
 
     const manualMins = parseInt(document.getElementById('focusDurationMins').value) || Math.ceil(elapsedSeconds / 60);
+    const finalBpm = parseInt(document.getElementById('focusSingleBpm').value) || 120;
 
     const payload = {
         key: document.getElementById('focusKeySelect').value,
         mode: document.getElementById('focusModeSelect').value,
         timeSignature: document.getElementById('focusTimeSigSelect').value,
         targetMinutes: parseInt(document.getElementById('focusTargetMins').value) || 15,
-        targetBpm: parseInt(document.getElementById('focusSingleBpm').value) || 120,
+        targetBpm: finalBpm,
         durationMins: manualMins,
         sessionNotes: document.getElementById('focusSessionNotes').value.trim(),
         completed: isCompleted,
@@ -467,6 +545,19 @@ async function saveFocusCard(isCompleted) {
     const itemPath = `users/${activeUser.uid}/practice_sessions/${currentSelectedDate}_${encodeURIComponent(currentInstrument)}/items/${activeCardEditing.id}`;
 
     await setDoc(doc(dbToUse, itemPath), payload, { merge: true });
+
+    // Sync Mastered BPM to Song Repertoire if card is a song and completed
+    if (isCompleted && activeCardEditing.isSong && activeCardEditing.songId) {
+        try {
+            const songRef = doc(dbToUse, `users/${activeUser.uid}/songs/${activeCardEditing.songId}`);
+            await setDoc(songRef, {
+                masteredBpm: finalBpm,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Error syncing mastered BPM to song repertoire:", e);
+        }
+    }
 
     closeFocusModal();
     await loadDailySession();
