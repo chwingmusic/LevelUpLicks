@@ -8,10 +8,17 @@
             <p class="text-xs text-zinc-400 mt-1">Track consistency, volume, and category breakdowns.</p>
         </div>
         
-        <!-- Redirect to Practice Page -->
-        <button id="btnStartTodaySession" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 self-start md:self-auto cursor-pointer">
-            <span>🚀</span> Start Today's Session
-        </button>
+        <div class="flex items-center gap-3">
+            <!-- INSTRUMENT SELECTOR DROPDOWN -->
+            <select id="dashboardInstrumentSelect" class="bg-zinc-900 border border-amber-500/30 text-amber-400 font-bold text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 cursor-pointer shadow-md">
+                <option value="ALL">🎷 All Instruments</option>
+                <!-- Dynamically populated from user's logs -->
+            </select>
+    
+            <button id="btnStartTodaySession" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-sm rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer">
+                <span>🚀</span> Start Today's Session
+            </button>
+        </div>
     </div>
 
     <!-- Period Selection Buttons & Permanent Date Range Pickers -->
