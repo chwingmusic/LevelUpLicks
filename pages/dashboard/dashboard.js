@@ -10,10 +10,10 @@ import {
 import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
 
 let categoryChart = null;
-
 let userPracticeLogs = [];
 let activeCalendarDate = new Date();
 let selectedPreset = 'this_month';
+let selectedInstrument = 'ALL';
 
 /**
  * Page Initialization
@@ -24,6 +24,7 @@ export async function initPage() {
     setupCalendarView();
 
     await fetchUserLogs();
+    populateInstrumentDropdown();
     applyPresetRange('this_month');
 }
 
@@ -57,16 +58,12 @@ async function fetchUserLogs() {
 
     try {
         const db = await getPersonalDatabaseInstance(user);
-
-        // Fetch all practice item subcollections
         const querySnapshot = await getDocs(collectionGroup(db, 'items'));
 
         userPracticeLogs = querySnapshot.docs
             .filter(d => d.ref.path.includes(`users/${user.uid}/practice_sessions/`))
             .map(d => {
                 const data = d.data();
-
-                // Extract date & instrument from path: users/{uid}/practice_sessions/{DATE}_{INSTRUMENT}/items/{docId}
                 const pathParts = d.ref.path.split('/');
                 const sessionFolder = pathParts[pathParts.indexOf('practice_sessions') + 1] || '';
                 const [datePart, ...instParts] = sessionFolder.split('_');
@@ -92,8 +89,24 @@ async function fetchUserLogs() {
 }
 
 /**
- * UI Event Listeners & Router Setup
+ * Populate Instrument Selector from practice logs
  */
+function populateInstrumentDropdown() {
+    const select = document.getElementById('dashboardInstrumentSelect');
+    if (!select) return;
+
+    const instrumentSet = new Set(userPracticeLogs.map(l => l.instrument).filter(Boolean));
+    const sortedInstruments = Array.from(instrumentSet).sort();
+
+    select.innerHTML = `<option value="ALL">🎷 All Instruments</option>` + 
+        sortedInstruments.map(inst => `<option value="${inst}">🎸 ${inst}</option>`).join('');
+
+    select.addEventListener('change', (e) => {
+        selectedInstrument = e.target.value;
+        renderDashboard();
+    });
+}
+
 function setupRedirectListener() {
     const btnStart = document.getElementById('btnStartTodaySession');
     if (btnStart) {
@@ -184,7 +197,7 @@ function formatDateForInput(date) {
 }
 
 /**
- * Core Render Pipeline
+ * Core Render Pipeline with Instrument Filtering
  */
 function renderDashboard() {
     const sVal = document.getElementById('startDatePicker')?.value;
@@ -193,26 +206,31 @@ function renderDashboard() {
     const start = sVal ? new Date(sVal + 'T00:00:00') : new Date(0);
     const end = eVal ? new Date(eVal + 'T23:59:59') : new Date();
 
-    // Current period logs
-    const filteredLogs = userPracticeLogs.filter(log => {
+    // 1. Filter logs by instrument first
+    const instrumentFilteredLogs = selectedInstrument === 'ALL'
+        ? userPracticeLogs
+        : userPracticeLogs.filter(l => l.instrument === selectedInstrument);
+
+    // 2. Filter logs by date range
+    const filteredLogs = instrumentFilteredLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= start && logDate <= end;
     });
 
-    // Prior period logs for comparison
+    // 3. Prior period comparison
     const periodDurationMs = end.getTime() - start.getTime();
     const priorStart = new Date(start.getTime() - periodDurationMs);
     const priorEnd = new Date(start.getTime() - 1);
 
-    const priorLogs = userPracticeLogs.filter(log => {
+    const priorLogs = instrumentFilteredLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= priorStart && logDate <= priorEnd;
     });
 
     renderTimeMetric(filteredLogs, priorLogs);
-    calculateStreak(filteredLogs);
+    calculateStreak(instrumentFilteredLogs, filteredLogs);
     renderCategoryCards(filteredLogs);
-    renderCalendarGrid();
+    renderCalendarGrid(instrumentFilteredLogs);
 }
 
 /**
@@ -249,20 +267,19 @@ function renderTimeMetric(currentLogs, priorLogs) {
 /**
  * Metric 2: Consecutive Day Active Streak
  */
-function calculateStreak(filteredLogs) {
+function calculateStreak(allInstrumentLogs, filteredLogs) {
     const streakSubtextEl = document.querySelector('#statActiveStreak')?.parentElement?.nextElementSibling;
 
-    if (userPracticeLogs.length === 0) {
+    if (allInstrumentLogs.length === 0) {
         const streakEl = document.getElementById('statActiveStreak');
         if (streakEl) streakEl.innerText = '0';
         if (streakSubtextEl) streakSubtextEl.innerText = 'No practice logs recorded yet';
         return;
     }
 
-    const uniqueDates = [...new Set(userPracticeLogs.map(l => l.date))].sort().reverse();
+    const uniqueDates = [...new Set(allInstrumentLogs.map(l => l.date))].sort().reverse();
     let streak = 0;
 
-    // Shift date by 4 hours to align with getLogicalDateString()
     const nowShifted = new Date(Date.now() - (4 * 60 * 60 * 1000));
     let checkDate = new Date(nowShifted.getFullYear(), nowShifted.getMonth(), nowShifted.getDate());
 
@@ -289,7 +306,6 @@ function calculateStreak(filteredLogs) {
 
 /**
  * Category Breakdown Component & Pie Chart Trigger
- * Only counts completed items
  */
 function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
@@ -298,7 +314,6 @@ function renderCategoryCards(logs) {
     const categories = {};
     const categoryPieCounts = {};
 
-    // Filter ONLY COMPLETED logs for category statistics
     const completedLogs = logs.filter(log => log.completed);
 
     completedLogs.forEach(log => {
@@ -307,18 +322,16 @@ function renderCategoryCards(logs) {
         }
         categories[log.category].totalPractices += 1;
 
-        // Tally totals for pie chart
         categoryPieCounts[log.category] = (categoryPieCounts[log.category] || 0) + 1;
 
         const topicKey = `${log.topic}|${log.key || ''}|${log.mode || ''}`;
         categories[log.category].topics[topicKey] = (categories[log.category].topics[topicKey] || 0) + 1;
     });
 
-    // Render Pie Chart with completed counts
     renderCategoryPieChart(categoryPieCounts);
 
     if (Object.keys(categories).length === 0) {
-        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No completed practice sessions logged in this period.</div>`;
+        container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No completed practice sessions logged for this selection.</div>`;
         return;
     }
 
@@ -357,10 +370,6 @@ function renderCategoryCards(logs) {
     }).join('');
 }
 
-/**
- * Calendar Day Detail Interaction
- * Displays all practices and clearly marks completed ones with green accents
- */
 function showDayDetails(dateStr, logs) {
     const panel = document.getElementById('dayDetailsPanel');
     const title = document.getElementById('selectedDateTitle');
@@ -378,8 +387,6 @@ function showDayDetails(dateStr, logs) {
 
     container.innerHTML = logs.map(log => {
         const isDone = Boolean(log.completed);
-        
-        // Dynamic border and badge styling
         const cardBorder = isDone 
             ? 'border-l-4 border-l-emerald-500 border-zinc-800 bg-zinc-900/90' 
             : 'border-l-4 border-l-zinc-700 border-zinc-800/60 bg-zinc-900/40 opacity-75';
@@ -415,21 +422,18 @@ function showDayDetails(dateStr, logs) {
     }).join('');
 }
 
-/**
- * Calendar Heatmap & Day Detail Interaction
- */
 function setupCalendarView() {
     const prevBtn = document.getElementById('btnPrevMonth');
     const nextBtn = document.getElementById('btnNextMonth');
 
     prevBtn?.addEventListener('click', () => {
         activeCalendarDate.setMonth(activeCalendarDate.getMonth() - 1);
-        renderCalendarGrid();
+        renderCalendarGrid(selectedInstrument === 'ALL' ? userPracticeLogs : userPracticeLogs.filter(l => l.instrument === selectedInstrument));
     });
 
     nextBtn?.addEventListener('click', () => {
         activeCalendarDate.setMonth(activeCalendarDate.getMonth() + 1);
-        renderCalendarGrid();
+        renderCalendarGrid(selectedInstrument === 'ALL' ? userPracticeLogs : userPracticeLogs.filter(l => l.instrument === selectedInstrument));
     });
 
     document.getElementById('btnCloseDayDetails')?.addEventListener('click', () => {
@@ -437,7 +441,7 @@ function setupCalendarView() {
     });
 }
 
-function renderCalendarGrid() {
+function renderCalendarGrid(logsToUse = userPracticeLogs) {
     const grid = document.getElementById('calendarGrid');
     const label = document.getElementById('calendarMonthLabel');
     if (!grid || !label) return;
@@ -458,7 +462,7 @@ function renderCalendarGrid() {
 
     for (let day = 1; day <= totalDaysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const dayLogs = userPracticeLogs.filter(l => l.date === dateStr);
+        const dayLogs = logsToUse.filter(l => l.date === dateStr);
         const totalMins = dayLogs.reduce((acc, curr) => acc + curr.minutes, 0);
 
         let bgClass = "bg-zinc-800/80 text-zinc-400";
@@ -476,10 +480,6 @@ function renderCalendarGrid() {
     }
 }
 
-/**
- * Renders or updates the Category Breakdown Pie Chart
- * @param {Object} categoryCounts Map of category names to completed count (e.g., { "ARPEGPIO": 5, "SCALE": 6 })
- */
 function renderCategoryPieChart(categoryCounts) {
     const canvas = document.getElementById('categoryPieChart');
     if (!canvas) return;
@@ -491,14 +491,13 @@ function renderCategoryPieChart(categoryCounts) {
     const badgeEl = document.getElementById('chartTotalCompletedBadge');
     if (badgeEl) badgeEl.innerText = `${totalCount} Total Completed`;
 
-    // Colors matching dark theme (Amber accent palette)
     const chartColors = [
-        '#f59e0b', // Amber-500
-        '#fbbf24', // Amber-400
-        '#d97706', // Amber-600
-        '#fcd34d', // Amber-300
-        '#b45309', // Amber-700
-        '#78350f'  // Amber-900
+        '#f59e0b',
+        '#fbbf24',
+        '#d97706',
+        '#fcd34d',
+        '#b45309',
+        '#78350f'
     ];
 
     if (categoryChart) {
@@ -518,7 +517,7 @@ function renderCategoryPieChart(categoryCounts) {
             datasets: [{
                 data: data,
                 backgroundColor: chartColors.slice(0, labels.length),
-                borderColor: '#18181b', // Zinc-900
+                borderColor: '#18181b',
                 borderWidth: 2
             }]
         },
@@ -529,7 +528,7 @@ function renderCategoryPieChart(categoryCounts) {
                 legend: {
                     position: 'right',
                     labels: {
-                        color: '#a1a1aa', // Zinc-400
+                        color: '#a1a1aa',
                         font: { size: 11, family: 'Plus Jakarta Sans' },
                         boxWidth: 12,
                         padding: 15
