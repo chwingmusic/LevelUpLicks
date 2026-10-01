@@ -179,8 +179,9 @@ function renderSongGrid() {
                         ${song.title}
                     </h4>
 
+                    // Inside renderSongGrid() in songlist.js
                     <div class="text-[11px] text-zinc-400 space-y-1">
-                        <p>🎵 Key: <strong class="text-zinc-200">${song.key || 'N/A'} ${song.mode && song.mode !== '(None)' ? song.mode : ''}</strong></p>
+                        <p>🎵 Key: <strong class="text-zinc-200">${song.key || 'N/A'} ${song.mode && song.mode !== '(None)' ? song.mode : ''} (${song.timeSignature || '4/4'})</strong></p>
                         <p>⚡ BPM: <strong class="text-zinc-200">${song.masteredBpm || 0} / ${song.targetBpm} BPM</strong></p>
                     </div>
                 </div>
