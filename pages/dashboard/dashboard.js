@@ -7,6 +7,9 @@ import {
     getDoc, 
     doc 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import Chart from 'https://cdn.jsdelivr.net/npm/chart.js/auto/+esm';
+
+let categoryChart = null;
 
 let userPracticeLogs = [];
 let activeCalendarDate = new Date();
@@ -285,14 +288,15 @@ function calculateStreak(filteredLogs) {
 }
 
 /**
- * Category Breakdown Component
- * FIX 1: Only counts completed items
+ * Category Breakdown Component & Pie Chart Trigger
+ * Only counts completed items
  */
 function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
     if (!container) return;
 
     const categories = {};
+    const categoryPieCounts = {};
 
     // Filter ONLY COMPLETED logs for category statistics
     const completedLogs = logs.filter(log => log.completed);
@@ -303,9 +307,15 @@ function renderCategoryCards(logs) {
         }
         categories[log.category].totalPractices += 1;
 
+        // Tally totals for pie chart
+        categoryPieCounts[log.category] = (categoryPieCounts[log.category] || 0) + 1;
+
         const topicKey = `${log.topic}|${log.key || ''}|${log.mode || ''}`;
         categories[log.category].topics[topicKey] = (categories[log.category].topics[topicKey] || 0) + 1;
     });
+
+    // Render Pie Chart with completed counts
+    renderCategoryPieChart(categoryPieCounts);
 
     if (Object.keys(categories).length === 0) {
         container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No completed practice sessions logged in this period.</div>`;
@@ -349,7 +359,7 @@ function renderCategoryCards(logs) {
 
 /**
  * Calendar Day Detail Interaction
- * FIX 2: Displays all practices and clearly marks completed ones with green accents
+ * Displays all practices and clearly marks completed ones with green accents
  */
 function showDayDetails(dateStr, logs) {
     const panel = document.getElementById('dayDetailsPanel');
@@ -464,4 +474,78 @@ function renderCalendarGrid() {
         dayCell.addEventListener('click', () => showDayDetails(dateStr, dayLogs));
         grid.appendChild(dayCell);
     }
+}
+
+/**
+ * Renders or updates the Category Breakdown Pie Chart
+ * @param {Object} categoryCounts Map of category names to completed count (e.g., { "ARPEGPIO": 5, "SCALE": 6 })
+ */
+function renderCategoryPieChart(categoryCounts) {
+    const canvas = document.getElementById('categoryPieChart');
+    if (!canvas) return;
+
+    const labels = Object.keys(categoryCounts);
+    const data = Object.values(categoryCounts);
+    const totalCount = data.reduce((acc, val) => acc + val, 0);
+
+    const badgeEl = document.getElementById('chartTotalCompletedBadge');
+    if (badgeEl) badgeEl.innerText = `${totalCount} Total Completed`;
+
+    // Colors matching dark theme (Amber accent palette)
+    const chartColors = [
+        '#f59e0b', // Amber-500
+        '#fbbf24', // Amber-400
+        '#d97706', // Amber-600
+        '#fcd34d', // Amber-300
+        '#b45309', // Amber-700
+        '#78350f'  // Amber-900
+    ];
+
+    if (categoryChart) {
+        categoryChart.destroy();
+    }
+
+    if (labels.length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    categoryChart = new Chart(canvas, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: chartColors.slice(0, labels.length),
+                borderColor: '#18181b', // Zinc-900
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: '#a1a1aa', // Zinc-400
+                        font: { size: 11, family: 'Plus Jakarta Sans' },
+                        boxWidth: 12,
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const val = context.raw || 0;
+                            const percentage = ((val / totalCount) * 100).toFixed(1);
+                            return ` ${label}: ${val} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
