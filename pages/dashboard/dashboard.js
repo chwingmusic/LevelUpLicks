@@ -15,12 +15,16 @@ let activeCalendarDate = new Date();
 let selectedPreset = 'this_month';
 let selectedInstrument = 'ALL';
 
+// Active display unit for category time ('mins' | 'hrs')
+let timeDisplayUnit = 'mins';
+
 /**
  * Page Initialization
  */
 export async function initPage() {
     setupRedirectListener();
     setupPeriodButtons();
+    setupUnitToggle();
     setupCalendarView();
 
     await fetchUserLogs();
@@ -105,6 +109,33 @@ function populateInstrumentDropdown() {
         selectedInstrument = e.target.value;
         renderDashboard();
     });
+}
+
+/**
+ * Setup Unit Toggle Listener (Minutes vs Hours)
+ */
+function setupUnitToggle() {
+    const btnMins = document.getElementById('btnUnitMinutes');
+    const btnHrs = document.getElementById('btnUnitHours');
+
+    if (!btnMins || !btnHrs) return;
+
+    btnMins.addEventListener('click', () => {
+        timeDisplayUnit = 'mins';
+        updateUnitToggleButtons(btnMins, btnHrs);
+        renderDashboard();
+    });
+
+    btnHrs.addEventListener('click', () => {
+        timeDisplayUnit = 'hrs';
+        updateUnitToggleButtons(btnHrs, btnMins);
+        renderDashboard();
+    });
+}
+
+function updateUnitToggleButtons(activeBtn, inactiveBtn) {
+    activeBtn.className = "category-unit-btn px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-zinc-950 transition-all cursor-pointer";
+    inactiveBtn.className = "category-unit-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer";
 }
 
 function setupRedirectListener() {
@@ -197,7 +228,7 @@ function formatDateForInput(date) {
 }
 
 /**
- * Core Render Pipeline with Instrument Filtering
+ * Core Render Pipeline
  */
 function renderDashboard() {
     const sVal = document.getElementById('startDatePicker')?.value;
@@ -206,18 +237,15 @@ function renderDashboard() {
     const start = sVal ? new Date(sVal + 'T00:00:00') : new Date(0);
     const end = eVal ? new Date(eVal + 'T23:59:59') : new Date();
 
-    // 1. Filter logs by instrument first
     const instrumentFilteredLogs = selectedInstrument === 'ALL'
         ? userPracticeLogs
         : userPracticeLogs.filter(l => l.instrument === selectedInstrument);
 
-    // 2. Filter logs by date range
     const filteredLogs = instrumentFilteredLogs.filter(log => {
         const logDate = new Date(log.date + 'T00:00:00');
         return logDate >= start && logDate <= end;
     });
 
-    // 3. Prior period comparison
     const periodDurationMs = end.getTime() - start.getTime();
     const priorStart = new Date(start.getTime() - periodDurationMs);
     const priorEnd = new Date(start.getTime() - 1);
@@ -305,30 +333,44 @@ function calculateStreak(allInstrumentLogs, filteredLogs) {
 }
 
 /**
- * Category Breakdown Component & Pie Chart Trigger
+ * Format minutes into display text based on active unit toggle
+ */
+function formatTimeValue(minutesVal) {
+    if (timeDisplayUnit === 'hrs') {
+        return `${(minutesVal / 60).toFixed(1)} hrs`;
+    }
+    return `${minutesVal} mins`;
+}
+
+/**
+ * Category Breakdown Component (Accumulates total practice duration)
  */
 function renderCategoryCards(logs) {
     const container = document.getElementById('categoryCardsContainer');
     if (!container) return;
 
     const categories = {};
-    const categoryPieCounts = {};
+    const categoryPieTimes = {};
 
+    // Filter ONLY COMPLETED logs for category statistics
     const completedLogs = logs.filter(log => log.completed);
 
     completedLogs.forEach(log => {
-        if (!categories[log.category]) {
-            categories[log.category] = { totalPractices: 0, topics: {} };
-        }
-        categories[log.category].totalPractices += 1;
+        const duration = Number(log.minutes) || 0;
 
-        categoryPieCounts[log.category] = (categoryPieCounts[log.category] || 0) + 1;
+        if (!categories[log.category]) {
+            categories[log.category] = { totalMinutes: 0, topics: {} };
+        }
+        categories[log.category].totalMinutes += duration;
+
+        // Tally accumulated time for pie chart
+        categoryPieTimes[log.category] = (categoryPieTimes[log.category] || 0) + duration;
 
         const topicKey = `${log.topic}|${log.key || ''}|${log.mode || ''}`;
-        categories[log.category].topics[topicKey] = (categories[log.category].topics[topicKey] || 0) + 1;
+        categories[log.category].topics[topicKey] = (categories[log.category].topics[topicKey] || 0) + duration;
     });
 
-    renderCategoryPieChart(categoryPieCounts);
+    renderCategoryPieChart(categoryPieTimes);
 
     if (Object.keys(categories).length === 0) {
         container.innerHTML = `<div class="col-span-3 text-xs text-zinc-500 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">No completed practice sessions logged for this selection.</div>`;
@@ -336,13 +378,13 @@ function renderCategoryCards(logs) {
     }
 
     container.innerHTML = Object.entries(categories).map(([catName, catData]) => {
-        const topicsListMarkup = Object.entries(catData.topics).map(([keyStr, count]) => {
+        const topicsListMarkup = Object.entries(catData.topics).map(([keyStr, minsVal]) => {
             const [topic, key, mode] = keyStr.split('|');
             const keyModeStr = (key || mode) ? `(${[key, mode].filter(Boolean).join(' ')})` : '';
             return `
                 <li class="flex items-center justify-between text-xs py-1 border-b border-zinc-800/50 last:border-0">
                     <span class="text-zinc-300 font-medium">${topic} <span class="text-amber-500/80 text-[10px]">${keyModeStr}</span></span>
-                    <span class="text-amber-400 font-mono font-bold">${count}x</span>
+                    <span class="text-amber-400 font-mono font-bold">${formatTimeValue(minsVal)}</span>
                 </li>
             `;
         }).join('');
@@ -352,7 +394,7 @@ function renderCategoryCards(logs) {
                 <div class="flex items-center justify-between">
                     <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider">${catName}</h3>
                     <span class="text-xs font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-lg">
-                        ${catData.totalPractices} completed
+                        ${formatTimeValue(catData.totalMinutes)}
                     </span>
                 </div>
 
@@ -480,16 +522,22 @@ function renderCalendarGrid(logsToUse = userPracticeLogs) {
     }
 }
 
-function renderCategoryPieChart(categoryCounts) {
+/**
+ * Renders or updates the Category Breakdown Pie Chart (Time-based)
+ */
+function renderCategoryPieChart(categoryTimes) {
     const canvas = document.getElementById('categoryPieChart');
     if (!canvas) return;
 
-    const labels = Object.keys(categoryCounts);
-    const data = Object.values(categoryCounts);
-    const totalCount = data.reduce((acc, val) => acc + val, 0);
+    const labels = Object.keys(categoryTimes);
+    const rawMinutesData = Object.values(categoryTimes);
+    const totalMinutes = rawMinutesData.reduce((acc, val) => acc + val, 0);
 
     const badgeEl = document.getElementById('chartTotalCompletedBadge');
-    if (badgeEl) badgeEl.innerText = `${totalCount} Total Completed`;
+    if (badgeEl) badgeEl.innerText = `${formatTimeValue(totalMinutes)} Total`;
+
+    // Convert values to active unit toggle for pie chart dataset
+    const chartData = rawMinutesData.map(m => timeDisplayUnit === 'hrs' ? parseFloat((m / 60).toFixed(1)) : m);
 
     const chartColors = [
         '#f59e0b',
@@ -515,7 +563,7 @@ function renderCategoryPieChart(categoryCounts) {
         data: {
             labels: labels,
             datasets: [{
-                data: data,
+                data: chartData,
                 backgroundColor: chartColors.slice(0, labels.length),
                 borderColor: '#18181b',
                 borderWidth: 2
@@ -539,8 +587,9 @@ function renderCategoryPieChart(categoryCounts) {
                         label: function(context) {
                             const label = context.label || '';
                             const val = context.raw || 0;
-                            const percentage = ((val / totalCount) * 100).toFixed(1);
-                            return ` ${label}: ${val} (${percentage}%)`;
+                            const unitStr = timeDisplayUnit === 'hrs' ? 'hrs' : 'mins';
+                            const percentage = totalMinutes > 0 ? (((rawMinutesData[context.dataIndex] || 0) / totalMinutes) * 100).toFixed(1) : 0;
+                            return ` ${label}: ${val} ${unitStr} (${percentage}%)`;
                         }
                     }
                 }
