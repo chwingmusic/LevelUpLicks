@@ -81,7 +81,20 @@
 
     <!-- Category Practice Breakdown Cards -->
     <div class="space-y-3">
-        <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">Practice Category Breakdown</h2>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">Practice Category Breakdown</h2>
+            
+            <!-- MINUTES / HOURS TOGGLE -->
+            <div class="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-0.5">
+                <button id="btnUnitMinutes" class="category-unit-btn px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-zinc-950 transition-all cursor-pointer">
+                    Minutes
+                </button>
+                <button id="btnUnitHours" class="category-unit-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer">
+                    Hours
+                </button>
+            </div>
+        </div>
+    
         <div id="categoryCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Dynamic Category Cards rendered here -->
         </div>
